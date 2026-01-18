@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Teacher, Student } from '@/types';
-import { MOCK_USERS, MOCK_CREDENTIALS, mockDelay } from '@/lib/mock-data';
+import * as authAPI from '@/lib/api/auth';
 
 type User = Teacher | Student;
 
@@ -38,36 +38,30 @@ export const useAuthStore = create<AuthState>()(
 
       login: async (email: string, password: string) => {
         set({ isLoading: true, error: null });
-        
-        await mockDelay(1000);
 
-        // Check mock users
-        if (email === MOCK_CREDENTIALS.teacher.email && password === MOCK_CREDENTIALS.teacher.password) {
+        try {
+          const user = await authAPI.signIn(email, password);
           set({
-            user: MOCK_USERS.teacher,
+            user: user as User,
             isAuthenticated: true,
             isLoading: false,
           });
           return true;
-        }
-
-        if (email === MOCK_CREDENTIALS.student.email && password === MOCK_CREDENTIALS.student.password) {
+        } catch (error: any) {
           set({
-            user: MOCK_USERS.student,
-            isAuthenticated: true,
+            error: error.message || 'Giriş başarısız',
             isLoading: false,
           });
-          return true;
+          return false;
         }
-
-        set({
-          error: 'E-posta veya şifre hatalı',
-          isLoading: false,
-        });
-        return false;
       },
 
-      logout: () => {
+      logout: async () => {
+        try {
+          await authAPI.signOut();
+        } catch (error) {
+          console.error('Logout error:', error);
+        }
         set({
           user: null,
           isAuthenticated: false,
@@ -77,50 +71,22 @@ export const useAuthStore = create<AuthState>()(
 
       signup: async (data: SignupData) => {
         set({ isLoading: true, error: null });
-        
-        await mockDelay(1500);
 
-        // Simulate email check
-        if (data.email === MOCK_CREDENTIALS.teacher.email || data.email === MOCK_CREDENTIALS.student.email) {
+        try {
+          const user = await authAPI.signUp(data);
           set({
-            error: 'Bu e-posta adresi zaten kullanımda',
+            user: user as User,
+            isAuthenticated: true,
+            isLoading: false,
+          });
+          return true;
+        } catch (error: any) {
+          set({
+            error: error.message || 'Kayıt başarısız',
             isLoading: false,
           });
           return false;
         }
-
-        // Create new user
-        const newUser: User = data.role === 'teacher'
-          ? {
-              id: `teacher-${Date.now()}`,
-              email: data.email,
-              name: data.name,
-              role: 'teacher',
-              school: data.school,
-              subject: data.subject || 'Matematik',
-              avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.name}`,
-              referenceVideoStatus: 'none',
-              createdAt: new Date(),
-            } as Teacher
-          : {
-              id: `student-${Date.now()}`,
-              email: data.email,
-              name: data.name,
-              role: 'student',
-              school: data.school,
-              grade: data.grade || '8. Sınıf',
-              avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.name}`,
-              savedVideos: [],
-              watchedVideos: [],
-              createdAt: new Date(),
-            } as Student;
-
-        set({
-          user: newUser,
-          isAuthenticated: true,
-          isLoading: false,
-        });
-        return true;
       },
 
       clearError: () => {

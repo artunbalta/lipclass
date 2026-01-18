@@ -49,6 +49,7 @@ export default function RootLayout({
       <body
         className={`${plusJakartaSans.variable} ${geistMono.variable} antialiased`}
         style={{ fontFamily: "var(--font-plus-jakarta-sans), system-ui, sans-serif" }}
+        suppressHydrationWarning
       >
         {children}
         <Toaster position="top-right" />

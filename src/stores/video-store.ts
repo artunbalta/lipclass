@@ -1,6 +1,13 @@
 import { create } from 'zustand';
 import { Video, VideoStats, CreateVideoFormData } from '@/types';
-import { MOCK_VIDEOS, MOCK_VIDEO_STATS, mockDelay } from '@/lib/mock-data';
+import * as videoAPI from '@/lib/api/videos';
+
+const initialStats: VideoStats = {
+  totalVideos: 0,
+  totalViews: 0,
+  videosThisMonth: 0,
+  studentCount: 0,
+};
 
 interface VideoState {
   videos: Video[];
@@ -20,66 +27,104 @@ interface VideoState {
 
 export const useVideoStore = create<VideoState>((set, get) => ({
   videos: [],
-  stats: MOCK_VIDEO_STATS,
+  stats: initialStats,
   isLoading: false,
   selectedVideo: null,
   filter: 'all',
 
   fetchVideos: async () => {
     set({ isLoading: true });
-    await mockDelay(800);
-    set({ videos: MOCK_VIDEOS, isLoading: false });
+    
+    try {
+      const { useAuthStore } = await import('./auth-store');
+      const user = useAuthStore.getState().user;
+      
+      if (!user) {
+        set({ videos: [], isLoading: false });
+        return;
+      }
+
+      const currentFilter = get().filter;
+      const filters = user.role === 'teacher' 
+        ? { 
+            teacherId: user.id, 
+            status: currentFilter !== 'all' ? (currentFilter as 'published' | 'draft' | 'processing' | 'failed') : undefined 
+          }
+        : { status: 'published' as const };
+      
+      const fetchedVideos = await videoAPI.getVideos(filters);
+      set({ videos: fetchedVideos, isLoading: false });
+
+      // Also fetch stats for teachers
+      if (user.role === 'teacher') {
+        try {
+          const stats = await videoAPI.getVideoStats(user.id);
+          set({ stats });
+        } catch (error) {
+          console.error('Error fetching stats:', error);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching videos:', error);
+      set({ videos: [], isLoading: false });
+    }
   },
 
   fetchVideoById: async (id: string) => {
     set({ isLoading: true });
-    await mockDelay(500);
-    const video = MOCK_VIDEOS.find((v) => v.id === id) || null;
-    set({ selectedVideo: video, isLoading: false });
-    return video;
+    
+    try {
+      const video = await videoAPI.getVideoById(id);
+      set({ selectedVideo: video, isLoading: false });
+      return video;
+    } catch (error) {
+      console.error('Error fetching video:', error);
+      set({ selectedVideo: null, isLoading: false });
+      return null;
+    }
   },
 
   createVideo: async (data: CreateVideoFormData) => {
     set({ isLoading: true });
-    await mockDelay(2000);
-
-    const newVideo: Video = {
-      id: `video-${Date.now()}`,
-      teacherId: 'teacher-1',
-      teacherName: 'Ayşe Yılmaz',
-      teacherAvatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Ayse',
-      title: data.topic,
-      description: data.description,
-      subject: data.subject,
-      grade: data.grade,
-      topic: data.topic,
-      thumbnailUrl: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=400&h=225&fit=crop',
-      videoUrl: '#',
-      duration: data.estimatedDuration * 60,
-      status: 'processing',
-      viewCount: 0,
-      createdAt: new Date(),
-      prompt: data.prompt,
-      includesProblemSolving: data.includesProblemSolving,
-      problemCount: data.problemCount,
-      difficulty: data.difficulty,
-    };
-
-    set((state) => ({
-      videos: [newVideo, ...state.videos],
-      isLoading: false,
-    }));
-
-    return newVideo;
+    
+    try {
+      const { useAuthStore } = await import('./auth-store');
+      const user = useAuthStore.getState().user;
+      
+      if (!user || user.role !== 'teacher') {
+        throw new Error('Only teachers can create videos');
+      }
+      
+      const newVideo = await videoAPI.createVideo(user.id, data);
+      
+      set((state) => ({
+        videos: [newVideo, ...state.videos],
+        isLoading: false,
+      }));
+      
+      return newVideo;
+    } catch (error) {
+      console.error('Error creating video:', error);
+      set({ isLoading: false });
+      throw error;
+    }
   },
 
   deleteVideo: async (id: string) => {
     set({ isLoading: true });
-    await mockDelay(500);
-    set((state) => ({
-      videos: state.videos.filter((v) => v.id !== id),
-      isLoading: false,
-    }));
+    
+    try {
+      await videoAPI.deleteVideo(id);
+      set((state) => ({
+        videos: state.videos.filter((v) => v.id !== id),
+        selectedVideo: state.selectedVideo?.id === id ? null : state.selectedVideo,
+        isLoading: false,
+      }));
+    } catch (error) {
+      console.error('Error deleting video:', error);
+      set({ isLoading: false });
+      throw error;
+    }
   },
 
   setFilter: (filter) => {
