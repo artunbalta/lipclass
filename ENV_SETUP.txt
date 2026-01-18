@@ -1,0 +1,11 @@
+# .env.local dosyası için içerik
+
+# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+
+# Optional: Service Role Key (only for server-side, never expose to client)
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+
+# Fal AI Configuration (for video generation - later)
+FAL_KEY=your_fal_ai_api_key
