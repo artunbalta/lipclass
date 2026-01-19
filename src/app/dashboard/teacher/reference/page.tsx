@@ -205,42 +205,50 @@ export default function ReferenceVideoPage() {
 
           {/* Video Preview */}
           <div className="relative aspect-video rounded-xl overflow-hidden bg-slate-900 mb-4 group">
-            {referenceVideoUrl && (
-              <video
-                ref={videoRef}
-                src={referenceVideoUrl}
-                className="w-full h-full object-contain"
-                controls={isPlaying}
-                onLoadedMetadata={(e) => {
-                  const video = e.currentTarget;
-                  const duration = video.duration;
-                  const minutes = Math.floor(duration / 60);
-                  const seconds = Math.floor(duration % 60);
-                  setVideoDuration(`${minutes}:${seconds.toString().padStart(2, '0')}`);
-                }}
-                onClick={() => setIsPlaying(true)}
-              />
-            )}
-            {!isPlaying && (
-              <div className="absolute inset-0 flex items-center justify-center bg-slate-900/50 group-hover:bg-slate-900/30 transition-colors">
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => {
-                    if (videoRef.current) {
-                      videoRef.current.play();
-                      setIsPlaying(true);
-                    }
+            {referenceVideoUrl ? (
+              <>
+                <video
+                  ref={videoRef}
+                  src={referenceVideoUrl}
+                  className="w-full h-full object-contain"
+                  controls={isPlaying}
+                  onLoadedMetadata={(e) => {
+                    const video = e.currentTarget;
+                    const duration = video.duration;
+                    const minutes = Math.floor(duration / 60);
+                    const seconds = Math.floor(duration % 60);
+                    setVideoDuration(`${minutes}:${seconds.toString().padStart(2, '0')}`);
                   }}
-                  className="w-16 h-16 rounded-full bg-primary/90 hover:bg-primary flex items-center justify-center shadow-lg z-10"
-                >
-                  <Play className="w-7 h-7 text-primary-foreground ml-1" fill="currentColor" />
-                </motion.button>
-              </div>
-            )}
-            {videoDuration && (
-              <div className="absolute bottom-4 right-4 px-2 py-1 rounded bg-black/70 text-white text-sm pointer-events-none">
-                {videoDuration}
+                  onPlay={() => setIsPlaying(true)}
+                  onPause={() => setIsPlaying(false)}
+                />
+                {!isPlaying && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-slate-900/50 group-hover:bg-slate-900/30 transition-colors pointer-events-none">
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (videoRef.current) {
+                          videoRef.current.play();
+                          setIsPlaying(true);
+                        }
+                      }}
+                      className="w-16 h-16 rounded-full bg-primary/90 hover:bg-primary flex items-center justify-center shadow-lg pointer-events-auto"
+                    >
+                      <Play className="w-7 h-7 text-primary-foreground ml-1" fill="currentColor" />
+                    </motion.button>
+                  </div>
+                )}
+                {videoDuration && !isPlaying && (
+                  <div className="absolute bottom-4 right-4 px-2 py-1 rounded bg-black/70 text-white text-sm pointer-events-none z-20">
+                    {videoDuration}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-slate-900">
+                <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
               </div>
             )}
           </div>
