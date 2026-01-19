@@ -246,18 +246,18 @@ export default function ReferenceVideoPage() {
           </div>
 
           {/* Video Info */}
-          <div className="grid sm:grid-cols-3 gap-4 mb-4">
+          <div className="grid sm:grid-cols-2 gap-4 mb-4">
             <div className="p-3 rounded-lg bg-muted/50 text-center">
               <div className="text-sm font-medium">Süre</div>
-              <div className="text-xs text-muted-foreground">3 dakika 24 saniye</div>
-            </div>
-            <div className="p-3 rounded-lg bg-muted/50 text-center">
-              <div className="text-sm font-medium">Çözünürlük</div>
-              <div className="text-xs text-muted-foreground">1920x1080 (Full HD)</div>
+              <div className="text-xs text-muted-foreground">
+                {videoDuration || 'Yükleniyor...'}
+              </div>
             </div>
             <div className="p-3 rounded-lg bg-muted/50 text-center">
               <div className="text-sm font-medium">Yüklenme</div>
-              <div className="text-xs text-muted-foreground">2 gün önce</div>
+              <div className="text-xs text-muted-foreground">
+                {uploadDate ? new Date(uploadDate).toLocaleDateString('tr-TR') : 'Yakın zamanda'}
+              </div>
             </div>
           </div>
 
