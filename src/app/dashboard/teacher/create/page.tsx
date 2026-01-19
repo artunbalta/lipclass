@@ -126,8 +126,8 @@ export default function CreateVideoPage() {
             showToast.info('Video senkronize ediliyor...', 'Ses ve video eşleştiriliyor.');
           }
         },
-      }).then(() => {
-        setGenerationProgress({ stage: 'completed', progress: 100, videoUrl: video.videoUrl });
+      }).then((videoUrl) => {
+        setGenerationProgress({ stage: 'completed', videoUrl });
         showToast.success('Video hazır!', 'Videonuz başarıyla oluşturuldu.');
         setTimeout(() => {
           router.push('/dashboard/teacher/videos');
