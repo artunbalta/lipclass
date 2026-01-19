@@ -87,3 +87,32 @@ export async function uploadThumbnail(userId: string, videoId: string, file: Fil
   
   return uploadFile('thumbnails', file, fileName);
 }
+
+/**
+ * Get reference video URL for a teacher
+ * Returns the most recent reference video URL
+ */
+export async function getReferenceVideoUrl(userId: string): Promise<string | null> {
+  try {
+    // List files in reference-videos bucket for this user
+    const { data, error } = await supabase.storage
+      .from('reference-videos')
+      .list(userId, {
+        limit: 1,
+        sortBy: { column: 'created_at', order: 'desc' },
+      });
+
+    if (error || !data || data.length === 0) {
+      return null;
+    }
+
+    // Get the most recent file
+    const latestFile = data[0];
+    const publicUrl = getPublicUrl('reference-videos', `${userId}/${latestFile.name}`);
+    
+    return publicUrl;
+  } catch (error) {
+    console.error('Error getting reference video URL:', error);
+    return null;
+  }
+}

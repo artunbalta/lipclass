@@ -27,8 +27,10 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useVideoStore } from '@/stores/video-store';
 import { showToast } from '@/lib/utils/toast';
-import { SUBJECTS, GRADES, PROMPT_TEMPLATES } from '@/lib/mock-data';
+import { SUBJECTS, GRADES, PROMPT_TEMPLATES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import { generateVideo, GenerationProgress } from '@/lib/api/generation';
+import { useAuthStore } from '@/stores/auth-store';
 
 const createVideoSchema = z.object({
   subject: z.string().min(1, 'Ders seçin'),
@@ -57,8 +59,10 @@ export default function CreateVideoPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [isCreating, setIsCreating] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState<GenerationProgress>({ stage: 'idle' });
   const router = useRouter();
   const { createVideo } = useVideoStore();
+  const { user } = useAuthStore();
 
   const {
     register,
@@ -86,21 +90,61 @@ export default function CreateVideoPage() {
   const watchAll = watch();
 
   const onSubmit = async (data: CreateVideoForm) => {
+    if (!user || user.role !== 'teacher') {
+      showToast.error('Hata', 'Sadece öğretmenler video oluşturabilir.');
+      return;
+    }
+
     setIsCreating(true);
+    setGenerationProgress({ stage: 'generating_content', progress: 0 });
+
     try {
+      // Step 1: Create video record in database
       const video = await createVideo({
         ...data,
         learningObjectives: [],
         keyConcepts: [],
       });
+
+      // Step 2: Start video generation (LLM → TTS → Lipsync)
+      // This runs in the background
+      generateVideo({
+        videoId: video.id,
+        teacherId: user.id,
+        prompt: data.prompt,
+        language: data.language,
+        tone: data.tone,
+        onProgress: (progress) => {
+          setGenerationProgress(progress);
+          
+          // Show toast for key stages
+          if (progress.stage === 'generating_content' && progress.progress === 30) {
+            showToast.info('İçerik oluşturuluyor...', 'AI ders metnini hazırlıyor.');
+          } else if (progress.stage === 'creating_audio') {
+            showToast.info('Ses oluşturuluyor...', 'Metin sese dönüştürülüyor.');
+          } else if (progress.stage === 'synthesizing_video') {
+            showToast.info('Video senkronize ediliyor...', 'Ses ve video eşleştiriliyor.');
+          }
+        },
+      }).then(() => {
+        setGenerationProgress({ stage: 'completed', progress: 100, videoUrl: video.videoUrl });
+        showToast.success('Video hazır!', 'Videonuz başarıyla oluşturuldu.');
+        setTimeout(() => {
+          router.push('/dashboard/teacher/videos');
+        }, 2000);
+      }).catch((error) => {
+        console.error('Video generation error:', error);
+        showToast.error('Generation hatası', error instanceof Error ? error.message : 'Video oluşturulurken bir hata oluştu.');
+      });
+
       setIsCreating(false);
       setIsSuccess(true);
-      showToast.success('Video oluşturuldu!', 'Videonuz hazırlanıyor, birkaç dakika içinde hazır olacak.');
-      setTimeout(() => {
-        router.push('/dashboard/teacher/videos');
-      }, 2000);
     } catch (error) {
       setIsCreating(false);
+      setGenerationProgress({ 
+        stage: 'failed', 
+        error: error instanceof Error ? error.message : 'Bilinmeyen hata' 
+      });
       showToast.error('Hata oluştu', 'Video oluşturulurken bir sorun yaşandı. Lütfen tekrar deneyin.');
     }
   };
@@ -116,20 +160,83 @@ export default function CreateVideoPage() {
   const prevStep = () => setCurrentStep((prev) => Math.max(prev - 1, 1));
 
   if (isSuccess) {
+    const getProgressLabel = () => {
+      switch (generationProgress.stage) {
+        case 'generating_content':
+          return 'İçerik oluşturuluyor...';
+        case 'creating_audio':
+          return 'Ses oluşturuluyor...';
+        case 'synthesizing_video':
+          return 'Video senkronize ediliyor...';
+        case 'uploading':
+          return 'Video yükleniyor...';
+        case 'completed':
+          return 'Video hazır!';
+        case 'failed':
+          return 'Hata oluştu';
+        default:
+          return 'Hazırlanıyor...';
+      }
+    };
+
+    const getProgressValue = () => {
+      if (generationProgress.stage === 'idle') return 0;
+      if ('progress' in generationProgress) return generationProgress.progress;
+      return 0;
+    };
+
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <motion.div
           initial={{ scale: 0.5, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="text-center"
+          className="text-center max-w-md w-full"
         >
-          <div className="w-20 h-20 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-6">
-            <Check className="w-10 h-10 text-emerald-500" />
-          </div>
-          <h2 className="text-2xl font-bold mb-2">Video Oluşturuluyor!</h2>
-          <p className="text-muted-foreground">
-            Videonuz hazırlanıyor. Bu işlem birkaç dakika sürebilir.
-          </p>
+          {generationProgress.stage === 'completed' ? (
+            <>
+              <div className="w-20 h-20 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-6">
+                <Check className="w-10 h-10 text-emerald-500" />
+              </div>
+              <h2 className="text-2xl font-bold mb-2">Video Hazır!</h2>
+              <p className="text-muted-foreground mb-4">
+                Videonuz başarıyla oluşturuldu. Videolar sayfasına yönlendiriliyorsunuz...
+              </p>
+            </>
+          ) : generationProgress.stage === 'failed' ? (
+            <>
+              <div className="w-20 h-20 rounded-full bg-destructive/20 flex items-center justify-center mx-auto mb-6">
+                <Loader2 className="w-10 h-10 text-destructive" />
+              </div>
+              <h2 className="text-2xl font-bold mb-2">Hata Oluştu</h2>
+              <p className="text-muted-foreground mb-4">
+                {'error' in generationProgress ? generationProgress.error : 'Bilinmeyen hata'}
+              </p>
+              <Button onClick={() => router.push('/dashboard/teacher/videos')}>
+                Videolar Sayfasına Dön
+              </Button>
+            </>
+          ) : (
+            <>
+              <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-6">
+                <Loader2 className="w-10 h-10 text-primary animate-spin" />
+              </div>
+              <h2 className="text-2xl font-bold mb-2">{getProgressLabel()}</h2>
+              <p className="text-muted-foreground mb-6">
+                Videonuz hazırlanıyor. Bu işlem birkaç dakika sürebilir.
+              </p>
+              
+              {/* Progress Bar */}
+              <div className="w-full bg-muted rounded-full h-2 mb-2">
+                <motion.div
+                  className="bg-primary h-2 rounded-full"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${getProgressValue()}%` }}
+                  transition={{ duration: 0.3 }}
+                />
+              </div>
+              <p className="text-sm text-muted-foreground">{getProgressValue()}%</p>
+            </>
+          )}
         </motion.div>
       </div>
     );

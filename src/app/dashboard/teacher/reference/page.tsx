@@ -19,6 +19,7 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { useAuthStore } from '@/stores/auth-store';
 import { showToast } from '@/lib/utils/toast';
 import { cn } from '@/lib/utils';
+import { uploadReferenceVideo, getReferenceVideoUrl, deleteFile } from '@/lib/api/storage';
 
 const requirements = [
   { id: 1, text: 'Minimum 2 dakika, maksimum 5 dakika süre', important: true },
@@ -38,6 +39,25 @@ export default function ReferenceVideoPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadComplete, setUploadComplete] = useState(false);
   const [hasVideo, setHasVideo] = useState(false);
+  const [referenceVideoUrl, setReferenceVideoUrl] = useState<string | null>(null);
+
+  // Check for existing reference video on mount
+  useEffect(() => {
+    const checkReferenceVideo = async () => {
+      if (user?.id) {
+        try {
+          const url = await getReferenceVideoUrl(user.id);
+          if (url) {
+            setHasVideo(true);
+            setReferenceVideoUrl(url);
+          }
+        } catch (error) {
+          console.error('Error checking reference video:', error);
+        }
+      }
+    };
+    checkReferenceVideo();
+  }, [user?.id]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -64,27 +84,47 @@ export default function ReferenceVideoPage() {
     }
   };
 
-  const handleFileUpload = (file: File) => {
-    // Simulate upload
+  const handleFileUpload = async (file: File) => {
+    if (!user?.id) {
+      showToast.error('Hata', 'Giriş yapmanız gerekiyor.');
+      return;
+    }
+
+    // Validate file
+    const maxSize = 500 * 1024 * 1024; // 500MB
+    if (file.size > maxSize) {
+      showToast.error('Dosya çok büyük', 'Maksimum dosya boyutu 500MB.');
+      return;
+    }
+
+    const validTypes = ['video/mp4', 'video/mov', 'video/webm', 'video/quicktime'];
+    if (!validTypes.includes(file.type)) {
+      showToast.error('Geçersiz format', 'Sadece MP4, MOV veya WebM formatları desteklenir.');
+      return;
+    }
+
     setIsUploading(true);
     setUploadProgress(0);
 
-    const interval = setInterval(() => {
-      setUploadProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setIsUploading(false);
-          setUploadComplete(true);
-          setTimeout(() => {
-            setHasVideo(true);
-            setUploadComplete(false);
-            showToast.success('Video yüklendi!', 'Referans videonuz başarıyla yüklendi ve işleniyor.');
-          }, 1500);
-          return 100;
-        }
-        return prev + 10;
-      });
-    }, 300);
+    try {
+      // Upload to Supabase Storage
+      const url = await uploadReferenceVideo(user.id, file);
+      
+      setUploadProgress(100);
+      setIsUploading(false);
+      setUploadComplete(true);
+      
+      setTimeout(() => {
+        setHasVideo(true);
+        setReferenceVideoUrl(url);
+        setUploadComplete(false);
+        showToast.success('Video yüklendi!', 'Referans videonuz başarıyla yüklendi.');
+      }, 1500);
+    } catch (error) {
+      setIsUploading(false);
+      setUploadProgress(0);
+      showToast.error('Yükleme hatası', error instanceof Error ? error.message : 'Video yüklenirken bir hata oluştu.');
+    }
   };
 
   const [deleteDialog, setDeleteDialog] = useState(false);
@@ -93,10 +133,37 @@ export default function ReferenceVideoPage() {
     setDeleteDialog(true);
   };
 
-  const handleDeleteConfirm = () => {
-    setHasVideo(false);
-    setDeleteDialog(false);
-    showToast.success('Video silindi', 'Referans videonuz kaldırıldı.');
+  const handleDeleteConfirm = async () => {
+    if (!user?.id || !referenceVideoUrl) {
+      setHasVideo(false);
+      setDeleteDialog(false);
+      return;
+    }
+
+    try {
+      // Extract path from URL and delete from storage
+      // URL format: https://xxx.supabase.co/storage/v1/object/public/reference-videos/userId/filename
+      const urlParts = referenceVideoUrl.split('/reference-videos/');
+      if (urlParts.length > 1) {
+        const path = `reference-videos/${urlParts[1]}`;
+        // Note: deleteFile expects bucket and path separately
+        // We need to extract the path correctly
+        const pathParts = urlParts[1].split('/');
+        if (pathParts.length >= 2) {
+          const filePath = `${pathParts[0]}/${pathParts[1]}`;
+          await deleteFile('reference-videos', filePath);
+        }
+      }
+
+      setHasVideo(false);
+      setReferenceVideoUrl(null);
+      setDeleteDialog(false);
+      showToast.success('Video silindi', 'Referans videonuz kaldırıldı.');
+    } catch (error) {
+      console.error('Error deleting video:', error);
+      showToast.error('Silme hatası', 'Video silinirken bir hata oluştu.');
+      setDeleteDialog(false);
+    }
   };
 
   return (
