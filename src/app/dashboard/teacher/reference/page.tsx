@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Upload, 
@@ -40,6 +40,10 @@ export default function ReferenceVideoPage() {
   const [uploadComplete, setUploadComplete] = useState(false);
   const [hasVideo, setHasVideo] = useState(false);
   const [referenceVideoUrl, setReferenceVideoUrl] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [videoDuration, setVideoDuration] = useState<string>('');
+  const [uploadDate, setUploadDate] = useState<Date | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   // Check for existing reference video on mount
   useEffect(() => {
@@ -50,6 +54,8 @@ export default function ReferenceVideoPage() {
           if (url) {
             setHasVideo(true);
             setReferenceVideoUrl(url);
+            // Upload date'i storage metadata'sından alabilirsiniz, şimdilik yeni tarih
+            setUploadDate(new Date());
           }
         } catch (error) {
           console.error('Error checking reference video:', error);
@@ -117,6 +123,7 @@ export default function ReferenceVideoPage() {
       setTimeout(() => {
         setHasVideo(true);
         setReferenceVideoUrl(url);
+        setUploadDate(new Date());
         setUploadComplete(false);
         showToast.success('Video yüklendi!', 'Referans videonuz başarıyla yüklendi.');
       }, 1500);
@@ -197,19 +204,45 @@ export default function ReferenceVideoPage() {
           </div>
 
           {/* Video Preview */}
-          <div className="relative aspect-video rounded-xl overflow-hidden bg-slate-900 mb-4">
-            <div className="absolute inset-0 flex items-center justify-center">
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                className="w-16 h-16 rounded-full bg-primary/90 flex items-center justify-center shadow-lg"
-              >
-                <Play className="w-7 h-7 text-primary-foreground ml-1" fill="currentColor" />
-              </motion.button>
-            </div>
-            <div className="absolute bottom-4 right-4 px-2 py-1 rounded bg-black/70 text-white text-sm">
-              3:24
-            </div>
+          <div className="relative aspect-video rounded-xl overflow-hidden bg-slate-900 mb-4 group">
+            {referenceVideoUrl && (
+              <video
+                ref={videoRef}
+                src={referenceVideoUrl}
+                className="w-full h-full object-contain"
+                controls={isPlaying}
+                onLoadedMetadata={(e) => {
+                  const video = e.currentTarget;
+                  const duration = video.duration;
+                  const minutes = Math.floor(duration / 60);
+                  const seconds = Math.floor(duration % 60);
+                  setVideoDuration(`${minutes}:${seconds.toString().padStart(2, '0')}`);
+                }}
+                onClick={() => setIsPlaying(true)}
+              />
+            )}
+            {!isPlaying && (
+              <div className="absolute inset-0 flex items-center justify-center bg-slate-900/50 group-hover:bg-slate-900/30 transition-colors">
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    if (videoRef.current) {
+                      videoRef.current.play();
+                      setIsPlaying(true);
+                    }
+                  }}
+                  className="w-16 h-16 rounded-full bg-primary/90 hover:bg-primary flex items-center justify-center shadow-lg z-10"
+                >
+                  <Play className="w-7 h-7 text-primary-foreground ml-1" fill="currentColor" />
+                </motion.button>
+              </div>
+            )}
+            {videoDuration && (
+              <div className="absolute bottom-4 right-4 px-2 py-1 rounded bg-black/70 text-white text-sm pointer-events-none">
+                {videoDuration}
+              </div>
+            )}
           </div>
 
           {/* Video Info */}
