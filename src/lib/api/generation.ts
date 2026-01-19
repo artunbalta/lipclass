@@ -113,7 +113,7 @@ export async function generateVideo(options: GenerationOptions): Promise<string>
       duration: lipsyncResponse.duration || Math.ceil(videoBlob.size / (1024 * 1024)), // Rough estimate
     } as any);
 
-    onProgress?.({ stage: 'completed', progress: 100, videoUrl: uploadedVideoUrl });
+    onProgress?.({ stage: 'completed', videoUrl: uploadedVideoUrl });
 
     return uploadedVideoUrl;
   } catch (error) {
