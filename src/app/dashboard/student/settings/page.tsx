@@ -244,20 +244,14 @@ export default function StudentSettingsPage() {
         >
           <div className="p-6 rounded-xl border border-border bg-card">
             <h3 className="font-semibold mb-4">Tema</h3>
-            <div className="grid grid-cols-3 gap-4">
-              {[
-                { id: 'light', label: 'Açık', preview: 'bg-white border' },
-                { id: 'dark', label: 'Koyu', preview: 'bg-slate-900' },
-                { id: 'system', label: 'Sistem', preview: 'bg-gradient-to-r from-white to-slate-900' },
-              ].map((theme) => (
-                <button
-                  key={theme.id}
-                  className="p-4 rounded-xl border-2 border-border hover:border-primary transition-colors text-center"
-                >
-                  <div className={cn('w-full h-12 rounded-lg mb-2', theme.preview)} />
-                  <span className="text-sm font-medium">{theme.label}</span>
-                </button>
-              ))}
+            <div className="flex items-center gap-4">
+              <div className="p-4 rounded-xl border-2 border-primary bg-primary/5 text-center">
+                <div className="w-full h-12 rounded-lg mb-2 bg-white border" />
+                <span className="text-sm font-medium">Açık</span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Uygulama yalnızca açık tema modunda çalışmaktadır.
+              </p>
             </div>
           </div>
         </motion.div>
