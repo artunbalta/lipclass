@@ -135,15 +135,17 @@ export function Hero() {
                   </>
                 }
               >
-                <Image
-                  src="/headeranimation.png"
-                  alt="LipClass - AI Eğitim Video Platformu"
-                  height={720}
-                  width={1400}
-                  className="mx-auto rounded-2xl object-cover h-full object-center"
-                  draggable={false}
-                  priority
-                />
+                <div className="relative w-full h-full min-h-[400px] md:min-h-[600px] flex items-center justify-center">
+                  <Image
+                    src="/headeranimation.png"
+                    alt="LipClass - AI Eğitim Video Platformu"
+                    fill
+                    className="rounded-2xl object-contain"
+                    draggable={false}
+                    priority
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1400px"
+                  />
+                </div>
               </ContainerScroll>
             </div>
 
