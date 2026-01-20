@@ -5,6 +5,8 @@ import { Play, ArrowRight, Sparkles, Zap, Users, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
+import { ContainerScroll } from '@/components/ui/container-scroll-animation';
+import Image from 'next/image';
 
 const floatingBadges = [
   { label: '10x Daha Hızlı', icon: Zap, position: 'top-20 -left-4 lg:left-8' },
@@ -119,92 +121,31 @@ export function Hero() {
               </Button>
             </motion.div>
 
-            {/* Hero Visual - Mock Video Player */}
-            <motion.div
-              initial={{ opacity: 0, y: 40 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.4 }}
-              className="relative max-w-4xl mx-auto"
-            >
-              {/* Browser Frame */}
-              <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-border bg-card">
-                {/* Browser Header */}
-                <div className="flex items-center gap-2 px-4 py-3 bg-muted/50 border-b border-border">
-                  <div className="flex gap-1.5">
-                    <div className="w-3 h-3 rounded-full bg-red-500/80" />
-                    <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
-                    <div className="w-3 h-3 rounded-full bg-green-500/80" />
-                  </div>
-                  <div className="flex-1 mx-4">
-                    <div className="bg-background rounded-lg px-4 py-1.5 text-sm text-muted-foreground text-center">
-                      app.lipclass.com/dashboard
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Video Preview Area */}
-                <div className="relative aspect-video bg-gradient-to-br from-slate-900 to-slate-800">
-                  {/* Mock Video Content */}
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    {/* Play Button Overlay */}
-                    <motion.div
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.95 }}
-                      className="w-20 h-20 rounded-full bg-primary/90 flex items-center justify-center cursor-pointer shadow-lg shadow-primary/30"
-                    >
-                      <Play className="w-8 h-8 text-primary-foreground ml-1" fill="currentColor" />
-                    </motion.div>
-                  </div>
-                  
-                  {/* Mock Teacher Silhouette */}
-                  <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-48 h-64 bg-gradient-to-t from-slate-700 to-transparent rounded-t-full opacity-50" />
-                  
-                  {/* Mock UI Elements */}
-                  <div className="absolute top-4 left-4 flex items-center gap-2">
-                    <div className="px-3 py-1 rounded-full bg-red-500/80 text-white text-xs font-medium flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                      CANLI
-                    </div>
-                  </div>
-                  
-                  <div className="absolute top-4 right-4">
-                    <Badge variant="secondary" className="bg-black/50 text-white border-0">
-                      AI Oluşturuluyor...
-                    </Badge>
-                  </div>
-                  
-                  {/* Progress Bar */}
-                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
-                    <motion.div
-                      initial={{ width: '0%' }}
-                      animate={{ width: '65%' }}
-                      transition={{ duration: 2, delay: 1, ease: 'easeOut' }}
-                      className="h-full bg-primary"
-                    />
-                  </div>
-                  
-                  {/* Tablet Drawing Area Mock */}
-                  <div className="absolute bottom-8 right-8 w-48 h-32 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20 p-3">
-                    <div className="text-xs text-white/60 mb-2">Soru Çözümü</div>
-                    <svg className="w-full h-16" viewBox="0 0 100 40">
-                      <motion.path
-                        d="M 10 30 Q 30 10 50 25 T 90 15"
-                        fill="none"
-                        stroke="white"
-                        strokeWidth="2"
-                        initial={{ pathLength: 0 }}
-                        animate={{ pathLength: 1 }}
-                        transition={{ duration: 2, delay: 1.5 }}
-                      />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-
-              {/* Decorative Elements */}
-              <div className="absolute -top-6 -right-6 w-24 h-24 bg-accent/20 rounded-full blur-2xl" />
-              <div className="absolute -bottom-6 -left-6 w-32 h-32 bg-primary/20 rounded-full blur-2xl" />
-            </motion.div>
+            {/* Hero Visual - Container Scroll Animation */}
+            <div className="relative max-w-4xl mx-auto mt-12">
+              <ContainerScroll
+                titleComponent={
+                  <>
+                    <h1 className="text-4xl font-semibold text-foreground">
+                      Eğitimde Yeni Bir Dönem <br />
+                      <span className="text-4xl md:text-[6rem] font-bold mt-1 leading-none bg-gradient-to-r from-primary via-purple-500 to-accent bg-clip-text text-transparent">
+                        AI ile Başlıyor
+                      </span>
+                    </h1>
+                  </>
+                }
+              >
+                <Image
+                  src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=1400&h=720&fit=crop&q=80"
+                  alt="LipClass - AI Eğitim Video Platformu"
+                  height={720}
+                  width={1400}
+                  className="mx-auto rounded-2xl object-cover h-full object-center"
+                  draggable={false}
+                  priority
+                />
+              </ContainerScroll>
+            </div>
 
             {/* Stats */}
             <motion.div
