@@ -136,7 +136,7 @@ export function Hero() {
                 }
               >
                 <Image
-                  src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=1400&h=720&fit=crop&q=80"
+                  src="/headeranimation.png"
                   alt="LipClass - AI Eğitim Video Platformu"
                   height={720}
                   width={1400}
