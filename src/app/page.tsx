@@ -6,7 +6,7 @@ import { AuroraBackground } from '@/components/ui/aurora-background';
 
 export default function Home() {
   return (
-    <AuroraBackground className="min-h-screen h-auto items-start justify-start">
+    <AuroraBackground className="min-h-screen h-auto">
       <Navbar />
       <Hero />
       <HowItWorks />

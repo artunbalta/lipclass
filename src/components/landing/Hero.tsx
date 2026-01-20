@@ -20,7 +20,7 @@ export function Hero() {
       {/* Background Effects - Removed for Aurora Background */}
 
       <div className="container relative mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-24">
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-5xl mx-auto text-center">
           {/* Floating Badges */}
           {floatingBadges.map((badge, index) => (
             <motion.div
