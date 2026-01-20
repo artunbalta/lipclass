@@ -17,16 +17,7 @@ const floatingBadges = [
 export function Hero() {
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
-      {/* Background Effects */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
-      <div className="absolute inset-0 hero-pattern" />
-      
-      {/* Animated Gradient Orbs */}
-      <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-primary/20 rounded-full blur-[120px] animate-pulse" />
-      <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-accent/20 rounded-full blur-[100px] animate-pulse delay-1000" />
-      
-      {/* Grid Pattern */}
-      <div className="absolute inset-0 grid-pattern opacity-30" />
+      {/* Background Effects - Removed for Aurora Background */}
 
       <div className="container relative mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-24">
         <div className="max-w-5xl mx-auto">

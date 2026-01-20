@@ -58,6 +58,11 @@
   --radius: 0.75rem;
   --font-jakarta: var(--font-plus-jakarta-sans), system-ui, sans-serif;
   
+  /* Aurora Background Variables */
+  --white: #ffffff;
+  --black: #000000;
+  --transparent: transparent;
+  
   /* Brand Colors - LipClass Palette */
   --brand-primary: #6366f1;
   --brand-primary-light: #818cf8;
@@ -187,6 +192,15 @@
   50% { background-position: 100% 50%; }
 }
 
+@keyframes aurora {
+  from {
+    background-position: 50% 50%, 50% 50%;
+  }
+  to {
+    background-position: 350% 50%, 350% 50%;
+  }
+}
+
 .animate-float {
   animation: float 6s ease-in-out infinite;
 }
@@ -209,6 +223,10 @@
 .animate-gradient {
   background-size: 200% 200%;
   animation: gradient-shift 8s ease infinite;
+}
+
+.animate-aurora {
+  animation: aurora 60s linear infinite;
 }
 
 /* Hero Background Pattern */
