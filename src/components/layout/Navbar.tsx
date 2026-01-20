@@ -41,14 +41,14 @@ export function Navbar() {
       )}
     >
       <nav className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center h-16 lg:h-20">
+        <div className="relative flex items-center justify-between h-16 lg:h-20">
           {/* Logo */}
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 z-10">
             <Logo size="md" />
           </div>
 
-          {/* Desktop Navigation */}
-          <div className="hidden lg:flex items-center justify-center gap-1 flex-1">
+          {/* Desktop Navigation - Absolutely Centered */}
+          <div className="hidden lg:flex items-center justify-center gap-1 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
             {navItems.map((item) => (
               <Link
                 key={item.href}
@@ -64,7 +64,7 @@ export function Navbar() {
           </div>
 
           {/* Desktop CTA */}
-          <div className="hidden lg:flex items-center gap-3 flex-shrink-0">
+          <div className="hidden lg:flex items-center gap-3 flex-shrink-0 z-10">
             <Link href="/signin">
               <Button variant="ghost" className="font-medium">
                 Giriş Yap
