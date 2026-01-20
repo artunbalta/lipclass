@@ -1,7 +1,7 @@
 'use client';
 
 import { Navbar, Footer } from '@/components/layout';
-import { Hero, HowItWorks, Features, Testimonials, Pricing } from '@/components/landing';
+import { Hero, HowItWorks } from '@/components/landing';
 import { AuroraBackground } from '@/components/ui/aurora-background';
 
 export default function Home() {
@@ -10,9 +10,6 @@ export default function Home() {
       <Navbar />
       <Hero />
       <HowItWorks />
-      <Features />
-      <Testimonials />
-      <Pricing />
       <Footer />
     </AuroraBackground>
   );

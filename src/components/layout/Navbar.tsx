@@ -10,9 +10,7 @@ import { Logo } from '@/components/shared/Logo';
 import { cn } from '@/lib/utils';
 
 const navItems = [
-  { label: 'Özellikler', href: '#features' },
   { label: 'Nasıl Çalışır', href: '#how-it-works' },
-  { label: 'Fiyatlandırma', href: '#pricing' },
   { label: 'Hakkımızda', href: '#about' },
 ];
 
