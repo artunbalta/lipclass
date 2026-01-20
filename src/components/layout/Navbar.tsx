@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 
 const navItems = [
   { label: 'Nasıl Çalışır', href: '#how-it-works' },
+  { label: 'SSS', href: '#faq' },
   { label: 'Hakkımızda', href: '#about' },
 ];
 
@@ -40,12 +41,14 @@ export function Navbar() {
       )}
     >
       <nav className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 lg:h-20">
+        <div className="flex items-center h-16 lg:h-20">
           {/* Logo */}
-          <Logo size="md" />
+          <div className="flex-shrink-0">
+            <Logo size="md" />
+          </div>
 
           {/* Desktop Navigation */}
-          <div className="hidden lg:flex items-center gap-1">
+          <div className="hidden lg:flex items-center justify-center gap-1 flex-1">
             {navItems.map((item) => (
               <Link
                 key={item.href}
@@ -61,7 +64,7 @@ export function Navbar() {
           </div>
 
           {/* Desktop CTA */}
-          <div className="hidden lg:flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-3 flex-shrink-0">
             <Link href="/signin">
               <Button variant="ghost" className="font-medium">
                 Giriş Yap
