@@ -180,6 +180,22 @@ interface CharacterColors {
   pupil: string;        // Eye pupil color
 }
 
+interface CharacterShape {
+  width: string;           // Genişlik (örn: '180px')
+  height: string;          // Yükseklik (örn: '400px')
+  heightTyping?: string;   // Yazarken yükseklik (opsiyonel)
+  borderRadius: string;    // Border radius (örn: '10px 10px 0 0' veya '50%' için daire)
+  left: string;           // Sol pozisyon (örn: '70px')
+  shape?: 'rectangle' | 'circle' | 'semicircle' | 'rounded'; // Şekil tipi
+}
+
+interface CharacterShapes {
+  primary: CharacterShape;
+  black: CharacterShape;
+  secondary: CharacterShape;
+  accent: CharacterShape;
+}
+
 const DEFAULT_COLORS: CharacterColors = {
   primary: '#6366f1',      // Indigo - Primary color
   black: '#2D2D2D',        // Dark gray/black
@@ -188,7 +204,45 @@ const DEFAULT_COLORS: CharacterColors = {
   pupil: '#2D2D2D',        // Dark gray for pupils
 };
 
-function LoginPage({ colors = DEFAULT_COLORS }: { colors?: CharacterColors }) {
+const DEFAULT_SHAPES: CharacterShapes = {
+  primary: {
+    width: '180px',
+    height: '400px',
+    heightTyping: '440px',
+    borderRadius: '10px 10px 0 0',
+    left: '70px',
+    shape: 'rounded',
+  },
+  black: {
+    width: '120px',
+    height: '310px',
+    borderRadius: '8px 8px 0 0',
+    left: '240px',
+    shape: 'rounded',
+  },
+  secondary: {
+    width: '240px',
+    height: '200px',
+    borderRadius: '120px 120px 0 0',
+    left: '0px',
+    shape: 'semicircle',
+  },
+  accent: {
+    width: '140px',
+    height: '230px',
+    borderRadius: '70px 70px 0 0',
+    left: '310px',
+    shape: 'rounded',
+  },
+};
+
+function LoginPage({ 
+  colors = DEFAULT_COLORS,
+  shapes = DEFAULT_SHAPES 
+}: { 
+  colors?: CharacterColors;
+  shapes?: CharacterShapes;
+}) {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -350,11 +404,13 @@ function LoginPage({ colors = DEFAULT_COLORS }: { colors?: CharacterColors }) {
               ref={primaryRef}
               className="absolute bottom-0 transition-all duration-700 ease-in-out"
               style={{
-                left: '70px',
-                width: '180px',
-                height: (isTyping || (password.length > 0 && !showPassword)) ? '440px' : '400px',
+                left: shapes.primary.left,
+                width: shapes.primary.width,
+                height: (isTyping || (password.length > 0 && !showPassword)) 
+                  ? (shapes.primary.heightTyping || shapes.primary.height)
+                  : shapes.primary.height,
                 backgroundColor: colors.primary,
-                borderRadius: '10px 10px 0 0',
+                borderRadius: shapes.primary.borderRadius,
                 zIndex: 1,
                 transform: (password.length > 0 && showPassword)
                   ? `skewX(0deg)`
@@ -400,11 +456,13 @@ function LoginPage({ colors = DEFAULT_COLORS }: { colors?: CharacterColors }) {
               ref={blackRef}
               className="absolute bottom-0 transition-all duration-700 ease-in-out"
               style={{
-                left: '240px',
-                width: '120px',
-                height: '310px',
+                left: shapes.black.left,
+                width: shapes.black.width,
+                height: (isTyping || (password.length > 0 && !showPassword))
+                  ? (shapes.black.heightTyping || shapes.black.height)
+                  : shapes.black.height,
                 backgroundColor: colors.black,
-                borderRadius: '8px 8px 0 0',
+                borderRadius: shapes.black.borderRadius,
                 zIndex: 2,
                 transform: (password.length > 0 && showPassword)
                   ? `skewX(0deg)`
@@ -452,12 +510,12 @@ function LoginPage({ colors = DEFAULT_COLORS }: { colors?: CharacterColors }) {
               ref={secondaryRef}
               className="absolute bottom-0 transition-all duration-700 ease-in-out"
               style={{
-                left: '0px',
-                width: '240px',
-                height: '200px',
+                left: shapes.secondary.left,
+                width: shapes.secondary.width,
+                height: shapes.secondary.height,
                 zIndex: 3,
                 backgroundColor: colors.secondary,
-                borderRadius: '120px 120px 0 0',
+                borderRadius: shapes.secondary.borderRadius,
                 transform: (password.length > 0 && showPassword) ? `skewX(0deg)` : `skewX(${secondaryPos.bodySkew || 0}deg)`,
                 transformOrigin: 'bottom center',
               }}
@@ -480,11 +538,11 @@ function LoginPage({ colors = DEFAULT_COLORS }: { colors?: CharacterColors }) {
               ref={accentRef}
               className="absolute bottom-0 transition-all duration-700 ease-in-out"
               style={{
-                left: '310px',
-                width: '140px',
-                height: '230px',
+                left: shapes.accent.left,
+                width: shapes.accent.width,
+                height: shapes.accent.height,
                 backgroundColor: colors.accent,
-                borderRadius: '70px 70px 0 0',
+                borderRadius: shapes.accent.borderRadius,
                 zIndex: 4,
                 transform: (password.length > 0 && showPassword) ? `skewX(0deg)` : `skewX(${accentPos.bodySkew || 0}deg)`,
                 transformOrigin: 'bottom center',
