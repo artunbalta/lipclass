@@ -2,44 +2,45 @@
 
 import LoginPage from '@/components/ui/animated-characters-login-page';
 
-// Karakter renklerini buradan özelleştirebilirsiniz
+// Çocuksu, neşeli renkler
 const customColors = {
-  primary: '#6366f1',      // Sol arkadaki uzun karakter (indigo)
-  black: '#2D2D2D',        // Ortadaki siyah karakter
-  secondary: '#f97316',    // Sol öndeki yarım daire karakter (turuncu)
-  accent: '#10b981',       // Sağ öndeki uzun karakter (yeşil)
-  pupil: '#2D2D2D',        // Göz bebeği rengi
+  primary: '#FF6B9D',      // Pembe - Sol arkadaki uzun karakter
+  black: '#4A90E2',        // Mavi - Ortadaki karakter
+  secondary: '#FFC857',    // Sarı - Sol öndeki yarım daire karakter
+  accent: '#95E1D3',       // Açık yeşil/mint - Sağ öndeki uzun karakter
+  pupil: '#2D2D2D',        // Göz bebeği rengi (koyu)
 };
 
-// Karakter şekillerini buradan özelleştirebilirsiniz
+// Çocuksu ve çeşitli boyutlar
 const customShapes = {
   primary: {
-    width: '180px',           // Genişlik
-    height: '400px',          // Normal yükseklik
-    heightTyping: '440px',    // Yazarken yükseklik (opsiyonel)
-    borderRadius: '10px 10px 0 0',  // Üst köşeler yuvarlatılmış
-    left: '70px',             // Sol pozisyon
-    shape: 'rounded' as const, // Şekil tipi: 'rectangle' | 'circle' | 'semicircle' | 'rounded'
+    width: '160px',           // Biraz daha dar
+    height: '380px',          // Biraz daha kısa
+    heightTyping: '420px',    // Yazarken uzar
+    borderRadius: '20px 20px 0 0',  // Daha yuvarlatılmış köşeler
+    left: '80px',             // Pozisyon ayarı
+    shape: 'rounded' as const,
   },
   black: {
-    width: '120px',
-    height: '310px',
-    borderRadius: '8px 8px 0 0',
-    left: '240px',
+    width: '110px',           // Biraz daha dar
+    height: '280px',          // Orta boy
+    heightTyping: '320px',    // Yazarken uzar
+    borderRadius: '15px 15px 0 0',  // Yuvarlatılmış
+    left: '250px',            // Pozisyon ayarı
     shape: 'rounded' as const,
   },
   secondary: {
-    width: '240px',
-    height: '200px',
-    borderRadius: '120px 120px 0 0',  // Yarım daire için genişlik/2
-    left: '0px',
+    width: '220px',           // Biraz daha dar
+    height: '180px',          // Kısa ve yuvarlak
+    borderRadius: '110px 110px 0 0',  // Yarım daire
+    left: '10px',             // Biraz daha sağa
     shape: 'semicircle' as const,
   },
   accent: {
-    width: '140px',
-    height: '230px',
-    borderRadius: '70px 70px 0 0',   // Yuvarlatılmış üst
-    left: '310px',
+    width: '130px',           // Biraz daha dar
+    height: '210px',          // Orta-kısa boy
+    borderRadius: '65px 65px 0 0',   // Yuvarlatılmış üst
+    left: '320px',            // Pozisyon ayarı
     shape: 'rounded' as const,
   },
 };
