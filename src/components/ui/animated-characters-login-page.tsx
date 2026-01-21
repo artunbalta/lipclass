@@ -172,7 +172,23 @@ const EyeBall = ({
   );
 };
 
-function LoginPage() {
+interface CharacterColors {
+  primary: string;      // Tall rectangle character (back left)
+  black: string;        // Tall rectangle character (middle)
+  secondary: string;    // Semi-circle character (front left)
+  accent: string;       // Tall rectangle character (front right)
+  pupil: string;        // Eye pupil color
+}
+
+const DEFAULT_COLORS: CharacterColors = {
+  primary: '#6366f1',      // Indigo - Primary color
+  black: '#2D2D2D',        // Dark gray/black
+  secondary: '#f97316',    // Orange - Secondary color
+  accent: '#10b981',       // Green - Accent color
+  pupil: '#2D2D2D',        // Dark gray for pupils
+};
+
+function LoginPage({ colors = DEFAULT_COLORS }: { colors?: CharacterColors }) {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -337,7 +353,7 @@ function LoginPage() {
                 left: '70px',
                 width: '180px',
                 height: (isTyping || (password.length > 0 && !showPassword)) ? '440px' : '400px',
-                backgroundColor: '#6366f1', // Primary color
+                backgroundColor: colors.primary,
                 borderRadius: '10px 10px 0 0',
                 zIndex: 1,
                 transform: (password.length > 0 && showPassword)
@@ -361,7 +377,7 @@ function LoginPage() {
                   pupilSize={7} 
                   maxDistance={5} 
                   eyeColor="white" 
-                  pupilColor="#2D2D2D" 
+                  pupilColor={colors.pupil} 
                   isBlinking={isPrimaryBlinking}
                   forceLookX={(password.length > 0 && showPassword) ? (isPrimaryPeeking ? 4 : -4) : isLookingAtEachOther ? 3 : undefined}
                   forceLookY={(password.length > 0 && showPassword) ? (isPrimaryPeeking ? 5 : -4) : isLookingAtEachOther ? 4 : undefined}
@@ -371,7 +387,7 @@ function LoginPage() {
                   pupilSize={7} 
                   maxDistance={5} 
                   eyeColor="white" 
-                  pupilColor="#2D2D2D" 
+                  pupilColor={colors.pupil} 
                   isBlinking={isPrimaryBlinking}
                   forceLookX={(password.length > 0 && showPassword) ? (isPrimaryPeeking ? 4 : -4) : isLookingAtEachOther ? 3 : undefined}
                   forceLookY={(password.length > 0 && showPassword) ? (isPrimaryPeeking ? 5 : -4) : isLookingAtEachOther ? 4 : undefined}
@@ -387,7 +403,7 @@ function LoginPage() {
                 left: '240px',
                 width: '120px',
                 height: '310px',
-                backgroundColor: '#2D2D2D',
+                backgroundColor: colors.black,
                 borderRadius: '8px 8px 0 0',
                 zIndex: 2,
                 transform: (password.length > 0 && showPassword)
@@ -413,7 +429,7 @@ function LoginPage() {
                   pupilSize={6} 
                   maxDistance={4} 
                   eyeColor="white" 
-                  pupilColor="#2D2D2D" 
+                  pupilColor={colors.pupil} 
                   isBlinking={isBlackBlinking}
                   forceLookX={(password.length > 0 && showPassword) ? -4 : isLookingAtEachOther ? 0 : undefined}
                   forceLookY={(password.length > 0 && showPassword) ? -4 : isLookingAtEachOther ? -4 : undefined}
@@ -423,7 +439,7 @@ function LoginPage() {
                   pupilSize={6} 
                   maxDistance={4} 
                   eyeColor="white" 
-                  pupilColor="#2D2D2D" 
+                  pupilColor={colors.pupil} 
                   isBlinking={isBlackBlinking}
                   forceLookX={(password.length > 0 && showPassword) ? -4 : isLookingAtEachOther ? 0 : undefined}
                   forceLookY={(password.length > 0 && showPassword) ? -4 : isLookingAtEachOther ? -4 : undefined}
@@ -440,7 +456,7 @@ function LoginPage() {
                 width: '240px',
                 height: '200px',
                 zIndex: 3,
-                backgroundColor: '#f97316', // Secondary color
+                backgroundColor: colors.secondary,
                 borderRadius: '120px 120px 0 0',
                 transform: (password.length > 0 && showPassword) ? `skewX(0deg)` : `skewX(${secondaryPos.bodySkew || 0}deg)`,
                 transformOrigin: 'bottom center',
@@ -454,8 +470,8 @@ function LoginPage() {
                   top: (password.length > 0 && showPassword) ? `${85}px` : `${90 + (secondaryPos.faceY || 0)}px`,
                 }}
               >
-                <Pupil size={12} maxDistance={5} pupilColor="#2D2D2D" forceLookX={(password.length > 0 && showPassword) ? -5 : undefined} forceLookY={(password.length > 0 && showPassword) ? -4 : undefined} />
-                <Pupil size={12} maxDistance={5} pupilColor="#2D2D2D" forceLookX={(password.length > 0 && showPassword) ? -5 : undefined} forceLookY={(password.length > 0 && showPassword) ? -4 : undefined} />
+                <Pupil size={12} maxDistance={5} pupilColor={colors.pupil} forceLookX={(password.length > 0 && showPassword) ? -5 : undefined} forceLookY={(password.length > 0 && showPassword) ? -4 : undefined} />
+                <Pupil size={12} maxDistance={5} pupilColor={colors.pupil} forceLookX={(password.length > 0 && showPassword) ? -5 : undefined} forceLookY={(password.length > 0 && showPassword) ? -4 : undefined} />
               </div>
             </div>
 
@@ -467,7 +483,7 @@ function LoginPage() {
                 left: '310px',
                 width: '140px',
                 height: '230px',
-                backgroundColor: '#10b981', // Accent color
+                backgroundColor: colors.accent,
                 borderRadius: '70px 70px 0 0',
                 zIndex: 4,
                 transform: (password.length > 0 && showPassword) ? `skewX(0deg)` : `skewX(${accentPos.bodySkew || 0}deg)`,
@@ -482,13 +498,14 @@ function LoginPage() {
                   top: (password.length > 0 && showPassword) ? `${35}px` : `${40 + (accentPos.faceY || 0)}px`,
                 }}
               >
-                <Pupil size={12} maxDistance={5} pupilColor="#2D2D2D" forceLookX={(password.length > 0 && showPassword) ? -5 : undefined} forceLookY={(password.length > 0 && showPassword) ? -4 : undefined} />
-                <Pupil size={12} maxDistance={5} pupilColor="#2D2D2D" forceLookX={(password.length > 0 && showPassword) ? -5 : undefined} forceLookY={(password.length > 0 && showPassword) ? -4 : undefined} />
+                <Pupil size={12} maxDistance={5} pupilColor={colors.pupil} forceLookX={(password.length > 0 && showPassword) ? -5 : undefined} forceLookY={(password.length > 0 && showPassword) ? -4 : undefined} />
+                <Pupil size={12} maxDistance={5} pupilColor={colors.pupil} forceLookX={(password.length > 0 && showPassword) ? -5 : undefined} forceLookY={(password.length > 0 && showPassword) ? -4 : undefined} />
               </div>
               {/* Horizontal line for mouth */}
               <div 
-                className="absolute w-20 h-[4px] bg-[#2D2D2D] rounded-full transition-all duration-200 ease-out"
+                className="absolute w-20 h-[4px] rounded-full transition-all duration-200 ease-out"
                 style={{
+                  backgroundColor: colors.pupil,
                   left: (password.length > 0 && showPassword) ? `${10}px` : `${40 + (accentPos.faceX || 0)}px`,
                   top: (password.length > 0 && showPassword) ? `${88}px` : `${88 + (accentPos.faceY || 0)}px`,
                 }}
