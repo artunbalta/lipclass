@@ -4,6 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:3000": "next dev -p 3000",
+    "dev:3001": "next dev -p 3001",
+    "dev:8080": "next dev -p 8080",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
@@ -31,6 +34,7 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-hook-form": "^7.71.1",
+    "react-use-measure": "^2.1.7",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
     "zod": "^4.3.5",
