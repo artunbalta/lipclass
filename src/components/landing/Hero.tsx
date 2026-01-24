@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Play, ArrowRight, Sparkles, Zap, Users, Video } from 'lucide-react';
+import { ArrowRight, Sparkles, Zap, Users, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
@@ -16,7 +16,7 @@ const floatingBadges = [
 
 export function Hero() {
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
+    <section className="relative min-h-screen flex items-center justify-center pt-20">
       {/* Background Effects - Removed for Aurora Background */}
 
       <div className="container relative mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-24">
@@ -102,14 +102,6 @@ export function Hero() {
                   <ArrowRight className="w-5 h-5" />
                 </Button>
               </Link>
-              <Button 
-                variant="outline" 
-                size="lg"
-                className="w-full sm:w-auto text-base px-8 py-6 border-2 hover:bg-muted/50 gap-2"
-              >
-                <Play className="w-5 h-5" />
-                Demo İzle
-              </Button>
             </motion.div>
 
             {/* Hero Visual - Container Scroll Animation */}
@@ -172,9 +164,6 @@ export function Hero() {
           </div>
         </div>
       </div>
-
-      {/* Bottom Gradient */}
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent" />
     </section>
   );
 }

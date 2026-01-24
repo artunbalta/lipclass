@@ -48,11 +48,7 @@ const steps = [
 
 export function HowItWorks() {
   return (
-    <section id="how-it-works" className="py-24 lg:py-32 relative overflow-hidden">
-      {/* Background */}
-      <div className="absolute inset-0 bg-muted/30" />
-      <div className="absolute inset-0 dot-pattern" />
-
+    <section id="how-it-works" className="py-24 lg:py-32 relative">
       <div className="container relative mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <motion.div

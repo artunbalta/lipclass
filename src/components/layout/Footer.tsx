@@ -23,7 +23,6 @@ const footerLinks = {
     links: [
       { label: 'Özellikler', href: '#features' },
       { label: 'Fiyatlandırma', href: '#pricing' },
-      { label: 'Demo', href: '#demo' },
       { label: 'API', href: '#api' },
     ],
   },

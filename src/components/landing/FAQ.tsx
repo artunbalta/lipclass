@@ -36,10 +36,7 @@ export function FAQ() {
   };
 
   return (
-    <section id="faq" className="py-24 lg:py-32 relative overflow-hidden">
-      {/* Background */}
-      <div className="absolute inset-0 bg-muted/20" />
-
+    <section id="faq" className="py-24 lg:py-32 relative">
       <div className="container relative mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <motion.div

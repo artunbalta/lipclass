@@ -34,7 +34,7 @@ const schools = [
 
 export function Schools() {
   return (
-    <section className="py-16 lg:py-24 relative overflow-hidden">
+    <section className="py-16 lg:py-24 relative">
       <div className="container relative mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <motion.div
