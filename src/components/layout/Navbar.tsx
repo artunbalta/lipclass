@@ -1,148 +1,61 @@
-'use client';
-
-import { useState, useEffect } from 'react';
+import { PillNav } from '@/components/ui/PillNav/PillNav';
+import { GraduationCap, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Logo } from '@/components/shared/Logo';
-import { cn } from '@/lib/utils';
 
 const navItems = [
   { label: 'Nasıl Çalışır', href: '#how-it-works' },
+  { label: 'Özellikler', href: '#features' },
   { label: 'SSS', href: '#faq' },
-  { label: 'Hakkımızda', href: '#about' },
 ];
 
 export function Navbar() {
-  const [isOpen, setIsOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-  const pathname = usePathname();
+  const AuthButtons = (
+    <>
+      <Link href="/signin">
+        <Button variant="ghost" className="font-semibold text-slate-700 hover:text-indigo-600 hover:bg-indigo-50">
+          Giriş Yap
+        </Button>
+      </Link>
+      <Link href="/signup">
+        <Button className="font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-900/20 hover:shadow-indigo-900/40 rounded-full px-6 transition-all duration-300 hover:scale-105">
+          Ücretsiz Dene
+          <ArrowRight className="w-4 h-4 ml-2 opacity-80" />
+        </Button>
+      </Link>
+    </>
+  );
 
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 20);
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  const MobileAuthButtons = (
+    <div className="flex flex-col gap-2 mt-2 pt-2 border-t border-slate-100">
+      <Link href="/signin" className="w-full">
+        <Button variant="ghost" className="w-full justify-center text-slate-700 hover:text-indigo-600 hover:bg-slate-50 h-11 font-medium bg-slate-50 border border-slate-100">
+          Giriş Yap
+        </Button>
+      </Link>
+      <Link href="/signup" className="w-full">
+        <Button className="w-full justify-center bg-indigo-600 hover:bg-indigo-700 text-white h-11 shadow-md shadow-indigo-200 font-medium">
+          Hemen Başla
+        </Button>
+      </Link>
+    </div>
+  );
 
   return (
-    <motion.header
-      initial={{ y: -100 }}
-      animate={{ y: 0 }}
-      className={cn(
-        'fixed top-0 left-0 right-0 z-50 transition-all duration-300',
-        scrolled
-          ? 'bg-background/80 backdrop-blur-xl border-b border-border shadow-sm'
-          : 'bg-transparent'
-      )}
-    >
-      <nav className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="relative flex items-center justify-between h-16 lg:h-20">
-          {/* Logo */}
-          <div className="flex-shrink-0 z-10">
-            <Logo size="md" />
-          </div>
-
-          {/* Desktop Navigation - Absolutely Centered */}
-          <div className="hidden lg:flex items-center justify-center gap-1 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  'px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200',
-                  'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                )}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </div>
-
-          {/* Desktop CTA */}
-          <div className="hidden lg:flex items-center gap-3 flex-shrink-0 z-10">
-            <Link href="/signin">
-              <Button variant="ghost" className="font-medium">
-                Giriş Yap
-              </Button>
-            </Link>
-            <Link href="/signup">
-              <Button className="font-medium bg-gradient-to-r from-primary to-primary/80 hover:opacity-90 transition-opacity">
-                Ücretsiz Dene
-              </Button>
-            </Link>
-          </div>
-
-          {/* Mobile Menu Button */}
-          <div className="flex items-center gap-2 lg:hidden">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsOpen(!isOpen)}
-              className="rounded-full"
-            >
-              {isOpen ? (
-                <X className="w-6 h-6" />
-              ) : (
-                <Menu className="w-6 h-6" />
-              )}
-            </Button>
-          </div>
-        </div>
-
-        {/* Mobile Menu */}
-        <AnimatePresence>
-          {isOpen && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2 }}
-              className="lg:hidden overflow-hidden"
-            >
-              <div className="py-4 space-y-2">
-                {navItems.map((item, index) => (
-                  <motion.div
-                    key={item.href}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                  >
-                    <Link
-                      href={item.href}
-                      onClick={() => setIsOpen(false)}
-                      className="block px-4 py-3 rounded-lg text-foreground hover:bg-muted transition-colors"
-                    >
-                      {item.label}
-                    </Link>
-                  </motion.div>
-                ))}
-                <motion.div
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: navItems.length * 0.05 }}
-                  className="pt-4 space-y-2"
-                >
-                  <Link href="/signin" onClick={() => setIsOpen(false)}>
-                    <Button variant="outline" className="w-full">
-                      Giriş Yap
-                    </Button>
-                  </Link>
-                  <Link href="/signup" onClick={() => setIsOpen(false)}>
-                    <Button className="w-full bg-gradient-to-r from-primary to-primary/80">
-                      Ücretsiz Dene
-                    </Button>
-                  </Link>
-                </motion.div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </nav>
-    </motion.header>
+    <div className="relative w-full z-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+        <PillNav
+          items={navItems}
+          logo={<GraduationCap className="text-white w-6 h-6" />}
+          logoAlt="LipClass Logo"
+          baseColor="#313a4dff" // gray-900
+          pillColor="#ffffff"
+          pillTextColor="#313a4dff"
+          hoveredPillTextColor="#ffffff"
+          rightElement={AuthButtons}
+          mobileExtras={MobileAuthButtons}
+        />
+      </div>
+    </div>
   );
 }

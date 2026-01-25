@@ -3,3 +3,6 @@ export { HowItWorks } from './HowItWorks';
 export { Schools } from './Schools';
 export { Testimonials } from './Testimonials';
 export { FAQ } from './FAQ';
+export { Comparison } from './Comparison';
+export { DemoShowcase } from './DemoShowcase';
+export { CTA } from './CTA';

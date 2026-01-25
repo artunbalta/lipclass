@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
+import LiquidEther from "@/components/ui/LiquidEther";
 import "./globals.css";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
@@ -15,25 +16,25 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LipClass - Bir Video Çek, Binlerce Ders Oluştur",
+  title: "LipClass | Okulunuzun En Üretken Öğretmeni: Yapay Zeka",
   description:
-    "AI destekli eğitim platformu ile öğretmenler zamandan tasarruf eder, öğrenciler kişiselleştirilmiş içeriklerle öğrenir. Referans videonuzu yükleyin, AI gerisini halleder.",
+    "Öğretmenleriniz yorulmasın. Tek bir video ile tüm müfredatı, her öğrenci seviyesi için özelleştirilmiş derslere dönüştürün. MEB uyumlu, KVKK güvenceli.",
   keywords: [
-    "eğitim",
-    "video",
-    "yapay zeka",
-    "AI",
-    "öğretmen",
-    "ders videosu",
-    "lipsync",
-    "MEB müfredatı",
-    "e-öğrenme",
+    "yapay zeka eğitim",
+    "okul dijital dönüşüm",
+    "müfredat uyumlu video",
+    "öğretmen tükenmişliği",
+    "lipclass",
+    "meb uyumlu içerik",
+    "eğitim teknolojileri",
+    "öğretmen asistanı",
+    "video ders anlatımı",
   ],
   authors: [{ name: "LipClass Team" }],
   openGraph: {
-    title: "LipClass - Bir Video Çek, Binlerce Ders Oluştur",
+    title: "LipClass | Öğretmenleriniz Yorulmasın, Eğitiminiz Çoğalsın",
     description:
-      "AI destekli eğitim platformu ile öğretmenler zamandan tasarruf eder.",
+      "Aynı dersi tekrar tekrar anlatmak tarih oldu. Tek bir video ile tüm müfredatı özelleştirilmiş derslere dönüştürün.",
     type: "website",
     locale: "tr_TR",
   },
@@ -51,6 +52,9 @@ export default function RootLayout({
         style={{ fontFamily: "var(--font-plus-jakarta-sans), system-ui, sans-serif" }}
         suppressHydrationWarning
       >
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: -1, pointerEvents: 'none' }}>
+          <LiquidEther />
+        </div>
         {children}
         <Toaster position="top-right" />
       </body>

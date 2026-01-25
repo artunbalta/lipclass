@@ -1,168 +1,128 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { 
-  Upload, 
-  MessageSquareText, 
-  Wand2, 
-  Share2, 
+import {
+  Upload,
+  Settings2,
+  Wand2,
+  BarChart3,
   ArrowRight,
-  CheckCircle2
+  CheckCircle2,
+  Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 
-const steps = [
+const features = [
   {
-    number: '01',
+    title: 'Stüdyo Kalitesi, Sıfır Ekipman',
+    description: 'Öğretmeniniz sadece kameraya konuşur. Işık, kurgu veya tekrar çekim derdi yok. 2 dakikalık doğal bir kayıt yeterli.',
     icon: Upload,
-    title: 'Referans Videonuzu Yükleyin',
-    description: 'Kendinizi tanıtan 2-3 dakikalık bir video çekin. İyi aydınlatma ve net ses yeterli.',
-    color: 'from-blue-500 to-indigo-500',
-    tips: ['Düz arka plan tercih edin', 'Doğal ışık kullanın', 'Net konuşun'],
+    className: "md:col-span-2",
+    gradient: "from-blue-50 to-indigo-50",
+    iconColor: "text-blue-600",
+    tips: ['Telefon kamerası yeterli', 'Tek seferlik kayıt']
   },
   {
-    number: '02',
-    icon: MessageSquareText,
-    title: 'Ders Konusunu ve Promptu Girin',
-    description: 'Hangi konuyu, hangi sınıfa anlatmak istediğinizi belirtin. AI gerisini halleder.',
-    color: 'from-purple-500 to-pink-500',
-    tips: ['MEB müfredatına uygun konular', 'Detaylı prompt yazın', 'Soru sayısını belirleyin'],
+    title: 'Müfredat Kontrolü',
+    description: 'AI, belirlediğiniz pedagojik sınırlardan asla dışarı çıkmaz. %100 MEB uyumlu.',
+    icon: Settings2,
+    className: "md:col-span-1",
+    gradient: "from-purple-50 to-fuchsia-50",
+    iconColor: "text-purple-600",
+    tips: ['Soru-Cevap ekleme']
   },
   {
-    number: '03',
+    title: 'Dijital İkiz Teknolojisi',
+    description: 'Öğretmeninizin sesi ve görüntüsü ile yüzlerce farklı ders videosunu dakikalar içinde oluşturun.',
     icon: Wand2,
-    title: 'AI Videonuzu Oluşturur',
-    description: 'Yapay zeka içeriği oluşturur, sese dönüştürür ve yüzünüzle senkronize eder.',
-    color: 'from-orange-500 to-red-500',
-    tips: ['LLM ile içerik üretimi', 'TTS ile ses oluşturma', 'Lipsync teknolojisi'],
+    className: "md:col-span-1",
+    gradient: "from-amber-50 to-orange-50",
+    iconColor: "text-amber-600",
+    tips: ['Kişiselleştirilmiş hitap']
   },
   {
-    number: '04',
-    icon: Share2,
-    title: 'Öğrencilerinizle Paylaşın',
-    description: 'Videoyu indirin veya doğrudan platform üzerinden öğrencilerinize gönderin.',
-    color: 'from-emerald-500 to-teal-500',
-    tips: ['Link ile paylaşım', 'QR kod oluşturma', 'İstatistik takibi'],
-  },
+    title: 'Veriye Dayalı Eğitim',
+    description: 'Videoları interaktif hale getirin. Hangi öğrenci nerede takıldı, anlık görün.',
+    icon: BarChart3,
+    className: "md:col-span-2",
+    gradient: "from-emerald-50 to-teal-50",
+    iconColor: "text-emerald-600",
+    tips: ['Detaylı izleme raporları', 'Quiz entegrasyonu', 'Öğrenci bazlı analiz']
+  }
 ];
 
 export function HowItWorks() {
   return (
-    <section id="how-it-works" className="py-24 lg:py-32 relative">
+    <section id="how-it-works" className="section-padding relative bg-white overflow-hidden">
+      {/* Background Decor */}
+      <div className="absolute top-0 right-0 -translate-y-12 translate-x-12 w-64 h-64 bg-indigo-50 rounded-full blur-3xl opacity-60" />
+      <div className="absolute bottom-0 left-0 translate-y-12 -translate-x-12 w-64 h-64 bg-orange-50 rounded-full blur-3xl opacity-60" />
+
       <div className="container relative mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Section Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
-          className="text-center max-w-3xl mx-auto mb-16 lg:mb-24"
-        >
-          <span className="text-primary font-semibold text-sm uppercase tracking-wider">
-            Nasıl Çalışır?
-          </span>
-          <h2 className="mt-4 text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight">
-            4 Adımda <span className="text-primary">Ders Videosu</span> Oluşturun
-          </h2>
-          <p className="mt-4 text-lg text-muted-foreground">
-            Karmaşık video düzenleme yazılımlarına son. 
-            Sadece birkaç dakikada profesyonel ders videoları hazırlayın.
-          </p>
-        </motion.div>
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16 lg:mb-24">
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            className="max-w-2xl"
+          >
+            <Badge variant="outline" className="mb-4 bg-indigo-50 text-indigo-700 border-indigo-100 hover:bg-indigo-100 transition-colors">
+              <Sparkles className="w-3 h-3 mr-1" />
+              NASIL ÇALIŞIR?
+            </Badge>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-slate-900">
+              Eğitim Fabrikası <br className="hidden lg:block" />
+              <span className="text-indigo-600">Nasıl İşler?</span>
+            </h2>
+          </motion.div>
 
-        {/* Steps */}
-        <div className="relative">
-          {/* Connection Line - Desktop */}
-          <div className="hidden lg:block absolute top-1/2 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-border to-transparent -translate-y-1/2" />
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-6">
-            {steps.map((step, index) => (
-              <motion.div
-                key={step.number}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                className="relative"
-              >
-                {/* Arrow - Desktop */}
-                {index < steps.length - 1 && (
-                  <div className="hidden lg:flex absolute top-12 -right-3 z-10">
-                    <ArrowRight className="w-6 h-6 text-muted-foreground/30" />
-                  </div>
-                )}
-
-                <div className="relative bg-card rounded-2xl p-6 lg:p-8 border border-border shadow-sm hover:shadow-lg transition-all duration-300 group h-full">
-                  {/* Step Number */}
-                  <div className="absolute -top-4 -left-2 lg:-left-4">
-                    <span className={cn(
-                      'text-6xl lg:text-7xl font-bold opacity-10 bg-gradient-to-br bg-clip-text text-transparent',
-                      step.color
-                    )}>
-                      {step.number}
-                    </span>
-                  </div>
-
-                  {/* Icon */}
-                  <div className={cn(
-                    'relative z-10 w-14 h-14 rounded-xl bg-gradient-to-br flex items-center justify-center mb-6 transition-transform duration-300 group-hover:scale-110',
-                    step.color
-                  )}>
-                    <step.icon className="w-7 h-7 text-white" />
-                  </div>
-
-                  {/* Content */}
-                  <h3 className="text-xl font-semibold mb-3 relative z-10">
-                    {step.title}
-                  </h3>
-                  <p className="text-muted-foreground text-sm mb-4 relative z-10">
-                    {step.description}
-                  </p>
-
-                  {/* Tips */}
-                  <ul className="space-y-2 relative z-10">
-                    {step.tips.map((tip) => (
-                      <li 
-                        key={tip} 
-                        className="flex items-center gap-2 text-xs text-muted-foreground"
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />
-                        {tip}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+          <motion.p
+            initial={{ opacity: 0, x: 20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            className="text-lg text-slate-600 max-w-md leading-relaxed"
+          >
+            Karmaşık prodüksiyon süreçlerini unutun.
+            Modern okulun ihtiyacı olan hızı ve kaliteyi yakalayın.
+          </motion.p>
         </div>
 
-        {/* Bottom CTA */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-          className="text-center mt-16"
-        >
-          <p className="text-muted-foreground mb-4">
-            Hemen denemeye başlayın. Kredi kartı gerekmez.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+          {features.map((feature, index) => (
             <motion.div
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+              key={feature.title}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: index * 0.1 }}
+              className={cn(
+                "group relative overflow-hidden rounded-3xl border border-slate-100 bg-white p-8 shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1",
+                feature.className
+              )}
             >
-              <a 
-                href="/signup"
-                className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-primary to-primary/80 text-primary-foreground font-medium shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all duration-300"
-              >
-                Ücretsiz Hesap Oluştur
-                <ArrowRight className="w-5 h-5" />
-              </a>
+              <div className={cn("absolute inset-0 bg-gradient-to-br opacity-50 group-hover:opacity-100 transition-opacity", feature.gradient)} />
+
+              <div className="relative z-10 flex flex-col h-full">
+                <div className={cn("w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center mb-6", feature.iconColor)}>
+                  <feature.icon className="w-6 h-6" />
+                </div>
+
+                <h3 className="text-xl font-bold text-slate-900 mb-3">{feature.title}</h3>
+                <p className="text-slate-600 leading-relaxed flex-grow">{feature.description}</p>
+
+                <div className="mt-6 pt-6 border-t border-slate-200/60 flex flex-wrap gap-3">
+                  {feature.tips.map((tip) => (
+                    <div key={tip} className="flex items-center text-xs font-semibold text-slate-500 bg-white/60 px-2 py-1 rounded-md">
+                      <CheckCircle2 className={cn("w-3 h-3 mr-1.5", feature.iconColor)} />
+                      {tip}
+                    </div>
+                  ))}
+                </div>
+              </div>
             </motion.div>
-          </div>
-        </motion.div>
+          ))}
+        </div>
       </div>
     </section>
   );
