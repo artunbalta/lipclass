@@ -13,27 +13,27 @@ interface Testimonial {
 
 const testimonials: Testimonial[] = [
   {
-    name: "Ayşe Yılmaz",
+    name: "Uğur Sorar",
     role: "Matematik Öğretmeni",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Ayse",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=al",
     content: "8. sınıf matematik derslerim için haftalık 5-6 video hazırlıyordum. LipClass ile aynı işi 30 dakikada bitiriyorum! Öğrencilerim videoların kalitesine hayran.",
   },
   {
-    name: "Ali Çelik",
+    name: "Arda Aslantaş",
     role: "Fizik Öğretmeni",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Ali",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=u",
     content: "Fizik derslerinde deney videoları hazırlamak çok zaman alıyordu. LipClass sayesinde teorik anlatımları hızlıca oluşturup, deneylere vakit ayırabiliyorum.",
   },
   {
-    name: "Zeynep Kaya",
+    name: "Ayşe Korkmaz",
     role: "Türkçe Öğretmeni",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Zeynep",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Ayse",
     content: "TTS kalitesi o kadar iyi ki, öğrencilerim gerçek sesim olduğunu düşünüyor! 5. sınıftan 8. sınıfa kadar her seviyeye uygun içerik üretebiliyorum.",
   },
   {
-    name: "Fatih Korkmaz",
+    name: "Lidya Pınaroğlu",
     role: "Biyoloji Öğretmeni",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Fatih",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Lidya",
     content: "Biyoloji derslerinde animasyonlu içerikler çok etkili. LipClass sayesinde karmaşık konuları basit ve anlaşılır hale getirmek artık çok kolay.",
   },
 ];
