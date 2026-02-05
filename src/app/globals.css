@@ -141,6 +141,10 @@
     @apply border-border outline-ring/50;
   }
 
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply bg-transparent text-foreground tracking-tight antialiased selection:bg-primary/10 selection:text-primary;
     font-feature-settings: "ss01", "ss02", "cv01", "cv02", "cv03";

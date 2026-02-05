@@ -6,3 +6,4 @@ export { FAQ } from './FAQ';
 export { Comparison } from './Comparison';
 export { DemoShowcase } from './DemoShowcase';
 export { CTA } from './CTA';
+export { AboutUs } from './AboutUs';
