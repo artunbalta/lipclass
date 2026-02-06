@@ -1,12 +1,13 @@
 import { PillNav } from '@/components/ui/PillNav/PillNav';
-import { GraduationCap, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 
 const navItems = [
-  { label: 'Nasıl Çalışır', href: '#how-it-works' },
-  { label: 'Özellikler', href: '#features' },
-  { label: 'SSS', href: '#faq' },
+  { label: 'Nasıl Çalışır', href: '/#how-it-works' },
+  { label: 'Özellikler', href: '/#features' },
+  { label: 'SSS', href: '/#faq' },
 ];
 
 export function Navbar() {
@@ -46,8 +47,21 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
         <PillNav
           items={navItems}
-          logo={<GraduationCap className="text-white w-6 h-6" />}
-          logoAlt="LipClass Logo"
+          logo={
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <g transform="translate(12, 12) rotate(-45)">
+                {/* Main chalk body */}
+                <line x1="-8" y1="-2" x2="8" y2="-2" stroke="white" strokeWidth="1.5" />
+                <line x1="-8" y1="2" x2="8" y2="2" stroke="white" strokeWidth="1.5" />
+                {/* Left elliptical end */}
+                <ellipse cx="-8" cy="0" rx="1.5" ry="2" fill="none" stroke="white" strokeWidth="1.5" />
+                {/* Right elliptical end */}
+                <ellipse cx="8" cy="0" rx="1.5" ry="2" fill="none" stroke="white" strokeWidth="1.5" />
+              </g>
+            </svg>
+          }
+          logoAlt="Chalk Logo"
+          logoHref="/"
           baseColor="#313a4dff" // gray-900
           pillColor="#ffffff"
           pillTextColor="#313a4dff"
@@ -59,3 +73,4 @@ export function Navbar() {
     </div>
   );
 }
+

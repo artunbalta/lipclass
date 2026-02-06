@@ -16,13 +16,13 @@ const testimonials: Testimonial[] = [
     name: "Uğur Sorar",
     role: "Matematik Öğretmeni",
     avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=al",
-    content: "8. sınıf matematik derslerim için haftalık 5-6 video hazırlıyordum. LipClass ile aynı işi 30 dakikada bitiriyorum! Öğrencilerim videoların kalitesine hayran.",
+    content: "8. sınıf matematik derslerim için haftalık 5-6 video hazırlıyordum. Chalk ile aynı işi 30 dakikada bitiriyorum! Öğrencilerim videoların kalitesine hayran.",
   },
   {
     name: "Arda Aslantaş",
     role: "Fizik Öğretmeni",
     avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=u",
-    content: "Fizik derslerinde deney videoları hazırlamak çok zaman alıyordu. LipClass sayesinde teorik anlatımları hızlıca oluşturup, deneylere vakit ayırabiliyorum.",
+    content: "Fizik derslerinde deney videoları hazırlamak çok zaman alıyordu. Chalk sayesinde teorik anlatımları hızlıca oluşturup, deneylere vakit ayırabiliyorum.",
   },
   {
     name: "Ayşe Korkmaz",
@@ -34,7 +34,7 @@ const testimonials: Testimonial[] = [
     name: "Lidya Pınaroğlu",
     role: "Biyoloji Öğretmeni",
     avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Lidya",
-    content: "Biyoloji derslerinde animasyonlu içerikler çok etkili. LipClass sayesinde karmaşık konuları basit ve anlaşılır hale getirmek artık çok kolay.",
+    content: "Biyoloji derslerinde animasyonlu içerikler çok etkili. Chalk sayesinde karmaşık konuları basit ve anlaşılır hale getirmek artık çok kolay.",
   },
 ];
 
@@ -62,7 +62,7 @@ export function Testimonials() {
             Öğretmenlerimiz <span className="text-indigo-600">Ne Diyor?</span>
           </h2>
           <p className="mt-4 text-lg text-slate-600">
-            Binlerce öğretmen LipClass ile ders videoları oluşturuyor.
+            Binlerce öğretmen Chalk ile ders videoları oluşturuyor.
           </p>
         </motion.div>
 

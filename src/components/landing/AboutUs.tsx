@@ -61,11 +61,8 @@ export function AboutUs() {
                     </Badge>
 
                     <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900">
-                        Vizyoner <span className="text-indigo-600">Ekibimiz</span>
+                        Biz <span className="text-indigo-600">Kimiz?</span>
                     </h2>
-                    <p className="mt-4 text-lg text-slate-600">
-                        LipClass&apos;ı eğitimde devrim yaratmak için bir araya gelen tutkulu mühendisler.
-                    </p>
                 </motion.div>
 
                 {/* Founders Grid */}

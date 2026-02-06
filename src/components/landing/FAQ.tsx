@@ -7,12 +7,12 @@ import { cn } from '@/lib/utils';
 
 const faqs = [
   {
-    question: 'LipClass nasıl çalışır?',
+    question: 'Chalk nasıl çalışır?',
     answer: 'Referans videonuzu yükleyin, konu ve prompt bilgilerini girin. AI sizin için mükemmel senkronize, müfredata uygun ders videoları oluşturur. Sistem, lipsync teknolojisi ile dudak hareketlerini senkronize eder ve profesyonel videolar üretir.',
   },
   {
     question: 'Hangi dersler için kullanabilirim?',
-    answer: 'LipClass tüm dersler için kullanılabilir. Matematik, Fen Bilimleri, Sosyal Bilgiler, Türkçe, İngilizce ve daha fazlası için müfredata uygun içerikler oluşturabilirsiniz.',
+    answer: 'Chalk tüm dersler için kullanılabilir. Matematik, Fen Bilimleri, Sosyal Bilgiler, Türkçe, İngilizce ve daha fazlası için müfredata uygun içerikler oluşturabilirsiniz.',
   },
   {
     question: 'Videolar ne kadar sürede hazır olur?',
@@ -54,7 +54,7 @@ export function FAQ() {
             Merak Ettikleriniz
           </h2>
           <p className="text-lg text-muted-foreground">
-            LipClass hakkında en çok sorulan sorular ve cevapları
+            Chalk hakkında en çok sorulan sorular ve cevapları
           </p>
         </motion.div>
 

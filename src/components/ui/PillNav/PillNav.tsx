@@ -14,6 +14,7 @@ interface NavItem {
 interface PillNavProps {
     logo?: string | React.ReactNode;
     logoAlt?: string;
+    logoHref?: string;
     items: NavItem[];
     activeHref?: string;
     className?: string;
@@ -32,6 +33,7 @@ interface PillNavProps {
 export function PillNav({
     logo,
     logoAlt = 'Logo',
+    logoHref = '/',
     items,
     activeHref,
     className = '',
@@ -256,10 +258,10 @@ export function PillNav({
         <div className={`pill-nav-container ${className}`} style={cssVars}>
             <nav className="pill-nav" aria-label="Primary">
                 {/* Logo Section */}
-                {isRouterLink(items?.[0]?.href) ? (
+                {isRouterLink(logoHref) ? (
                     <Link
                         className="pill-logo"
-                        href={items[0].href}
+                        href={logoHref}
                         aria-label="Home"
                         onMouseEnter={handleLogoEnter}
                         ref={el => {
@@ -277,7 +279,7 @@ export function PillNav({
                 ) : (
                     <a
                         className="pill-logo"
-                        href={items?.[0]?.href || '#'}
+                        href={logoHref}
                         aria-label="Home"
                         onMouseEnter={handleLogoEnter}
                         ref={el => {

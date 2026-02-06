@@ -63,7 +63,7 @@ export default function VideoDetailPage() {
   };
 
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(`https://app.lipclass.com/watch/${params.id}`);
+    navigator.clipboard.writeText(`https://app.chalk.com/watch/${params.id}`);
     setCopied(true);
     toast.success('Link kopyalandı!', { description: 'Video linki panoya kopyalandı.' });
     setTimeout(() => setCopied(false), 2000);

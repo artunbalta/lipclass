@@ -158,7 +158,7 @@ export const MOCK_TESTIMONIALS: Testimonial[] = [
     role: 'Matematik Öğretmeni',
     school: 'Cumhuriyet Ortaokulu',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Mustafa',
-    content: 'LipClass sayesinde ders videolarımı hazırlamak artık saatler değil dakikalar sürüyor. Öğrencilerim de videoları çok seviyor!',
+    content: 'Chalk sayesinde ders videolarımı hazırlamak artık saatler değil dakikalar sürüyor. Öğrencilerim de videoları çok seviyor!',
     rating: 5,
   },
   {
@@ -176,7 +176,7 @@ export const MOCK_TESTIMONIALS: Testimonial[] = [
     role: 'Okul Müdürü',
     school: 'Mehmet Akif Ersoy Ortaokulu',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Ali',
-    content: 'Okulumuzda tüm öğretmenler LipClass kullanıyor. Eğitim kalitemiz gözle görülür şekilde arttı.',
+    content: 'Okulumuzda tüm öğretmenler Chalk kullanıyor. Eğitim kalitemiz gözle görülür şekilde arttı.',
     rating: 5,
   },
 ];

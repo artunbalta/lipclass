@@ -175,7 +175,7 @@ export function DemoShowcase() {
                                 <div className="inline-flex items-center justify-center gap-2 bg-white border border-slate-200 rounded-md px-3 py-1 shadow-sm">
                                     <span className="text-xs text-slate-500 font-medium flex items-center gap-1">
                                         <span className="w-2 h-2 rounded-full bg-green-500" />
-                                        app.lipclass.com / demo-studio
+                                        app.chalk.com / demo-studio
                                     </span>
                                 </div>
                             </div>

@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LipClass | Okulunuzun En Üretken Öğretmeni: Yapay Zeka",
+  title: "Chalk | Okulunuzun En Üretken Öğretmeni: Yapay Zeka",
   description:
     "Öğretmenleriniz yorulmasın. Tek bir video ile tüm müfredatı, her öğrenci seviyesi için özelleştirilmiş derslere dönüştürün. MEB uyumlu, KVKK güvenceli.",
   keywords: [
@@ -24,15 +24,15 @@ export const metadata: Metadata = {
     "okul dijital dönüşüm",
     "müfredat uyumlu video",
     "öğretmen tükenmişliği",
-    "lipclass",
+    "chalk",
     "meb uyumlu içerik",
     "eğitim teknolojileri",
     "öğretmen asistanı",
     "video ders anlatımı",
   ],
-  authors: [{ name: "LipClass Team" }],
+  authors: [{ name: "Chalk Team" }],
   openGraph: {
-    title: "LipClass | Öğretmenleriniz Yorulmasın, Eğitiminiz Çoğalsın",
+    title: "Chalk | Öğretmenleriniz Yorulmasın, Eğitiminiz Çoğalsın",
     description:
       "Aynı dersi tekrar tekrar anlatmak tarih oldu. Tek bir video ile tüm müfredatı özelleştirilmiş derslere dönüştürün.",
     type: "website",

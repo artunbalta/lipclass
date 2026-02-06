@@ -86,7 +86,7 @@ export function Comparison() {
                                 <CheckCircle2 className="w-6 h-6 text-white" />
                             </div>
                             <div>
-                                <h3 className="text-xl font-bold text-indigo-900">LipClass Yöntemi</h3>
+                                <h3 className="text-xl font-bold text-indigo-900">Chalk Yöntemi</h3>
                                 <p className="text-sm text-indigo-600 font-medium">Otomatize ve Ölçeklenebilir</p>
                             </div>
                         </div>

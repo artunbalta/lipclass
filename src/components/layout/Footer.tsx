@@ -21,16 +21,15 @@ const footerLinks = {
   product: {
     title: 'Ürün',
     links: [
-      { label: 'Özellikler', href: '#features' },
-      { label: 'Nasıl Çalışır?', href: '#how-it-works' }, // Fixed usage
-      { label: 'Eğitimler', href: '#tutorials' },
+      { label: 'Özellikler', href: '/#features' },
+      { label: 'Nasıl Çalışır?', href: '/#how-it-works' },
+      { label: 'Eğitimler', href: '/#tutorials' },
     ],
   },
   company: {
     title: 'Şirket',
     links: [
-      { label: 'Hakkımızda', href: '#about' },
-      { label: 'Kariyer', href: '/careers' },
+      { label: 'Hakkımızda', href: '/#about' },
       { label: 'İletişim', href: '/contact' },
     ],
   },
@@ -42,14 +41,14 @@ const footerLinks = {
     ],
   },
 };
-
+/*
 const socialLinks = [
   { icon: Twitter, href: '#', label: 'Twitter' },
   { icon: Linkedin, href: '#', label: 'LinkedIn' },
   { icon: Instagram, href: '#', label: 'Instagram' },
   { icon: Youtube, href: '#', label: 'YouTube' },
 ];
-
+*/
 export function Footer() {
   return (
     <footer className="bg-white border-t border-slate-100">
@@ -87,10 +86,11 @@ export function Footer() {
             <div className="col-span-2 lg:col-span-2">
               <Logo size="lg" />
               <p className="mt-6 text-slate-500 text-sm max-w-sm leading-relaxed">
-                LipClass, yapay zeka teknolojisi ile öğretmenleri dijital dünyada güçlendiren, okulları geleceğe taşıyan yeni nesil eğitim platformudur.
+                Chalk, yapay zeka teknolojisi ile öğretmenleri dijital dünyada güçlendiren, okulları geleceğe taşıyan yeni nesil eğitim platformudur.
               </p>
 
               {/* Social Links */}
+              {/*
               <div className="mt-8 flex items-center gap-3">
                 {socialLinks.map((social) => (
                   <a
@@ -103,6 +103,7 @@ export function Footer() {
                   </a>
                 ))}
               </div>
+              */}
             </div>
 
             {/* Links Columns */}
@@ -133,12 +134,12 @@ export function Footer() {
         {/* Bottom Bar */}
         <div className="py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-sm text-slate-400">
-            © {new Date().getFullYear()} LipClass Teknoloji A.Ş. Tüm hakları saklıdır.
+            © {new Date().getFullYear()} Chalk Teknoloji A.Ş. Tüm hakları saklıdır.
           </p>
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2 text-sm text-slate-400">
               <MapPin className="w-4 h-4" />
-              <span>İstanbul, TR</span>
+              <span>Ankara, TR</span>
             </div>
           </div>
         </div>

@@ -11,15 +11,15 @@ import GlitchText from '@/components/ui/GlitchText';
 import { useState, useEffect } from 'react';
 
 const floatingBadges = [
-  { label: 'Öğretmen Zamanı x10', icon: Clock, position: 'top-20 -left-6 lg:left-0 rotate-[-4deg]' },
-  { label: '%100 Müfredat Uyumu', icon: School, position: 'top-32 -right-6 lg:right-0 rotate-[4deg]' },
-  { label: 'Sıfır Tükenmişlik', icon: Zap, position: 'bottom-32 -left-2 lg:left-12 rotate-[-2deg]' },
+  { label: 'Öğretmen Zamanı x10', icon: Clock, position: 'top-20 -left-16 xl:-left-8 2xl:left-0 rotate-[-4deg]' },
+  { label: '%100 Müfredat Uyumu', icon: School, position: 'top-32 -right-16 xl:-right-8 2xl:right-0 rotate-[4deg]' },
+  { label: 'Sıfır Tükenmişlik', icon: Zap, position: 'bottom-32 -left-12 xl:-left-4 2xl:left-12 rotate-[-2deg]' },
 ];
 
 export function Hero() {
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
   const [isGlitching, setIsGlitching] = useState(false);
-  const words = ["Otonom", "Kişiselleştirilmiş", "Sınırsız"];
+  const words = ["Sınırsız", "Kişiselleştirilmiş", "Otonom"];
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -50,8 +50,8 @@ export function Hero() {
 
       <div className="container relative z-10 mx-auto px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto text-center">
-          {/* Floating Badges (Desktop Only) */}
-          <div className="hidden lg:block absolute inset-0 pointer-events-none max-w-7xl mx-auto">
+          {/* Floating Badges (Desktop Only - xl and above) */}
+          <div className="hidden xl:block absolute inset-0 pointer-events-none max-w-7xl mx-auto">
             {floatingBadges.map((badge, index) => (
               <motion.div
                 key={badge.label}
