@@ -158,11 +158,23 @@ Return ONLY valid JSON, nothing else. Format:
 
   // Parse the JSON output from LLM
   const rawOutput = response.output.trim();
-  // Try to extract JSON from the output (LLM might wrap it in markdown code blocks)
+  // Extract JSON - LLM often wraps in markdown code blocks (```json ... ```)
   let jsonStr = rawOutput;
-  const jsonMatch = rawOutput.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (jsonMatch) {
-    jsonStr = jsonMatch[1].trim();
+  if (rawOutput.includes('```')) {
+    const match = rawOutput.match(/```(?:json|JSON)?\s*\n?([\s\S]*?)\n?```/);
+    if (match?.[1]) {
+      jsonStr = match[1].trim();
+    } else {
+      jsonStr = rawOutput.replace(/^```(?:json|JSON)?\s*\n?/i, '').replace(/\n?```\s*$/, '').trim();
+    }
+  }
+  // If still not valid JSON start, try to extract {...} block
+  if (jsonStr.startsWith('`') || !jsonStr.startsWith('{')) {
+    const firstBrace = jsonStr.indexOf('{');
+    const lastBrace = jsonStr.lastIndexOf('}');
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
+    }
   }
 
   /**
@@ -314,9 +326,9 @@ async function textToSpeech(
 }
 
 /**
- * Create a lipsync video using fal-ai/sync-lipsync.
+ * Create a lipsync video using VEED lipsync (veed/lipsync on fal.ai).
  * Takes a reference video + TTS audio → produces video with synced lip movements + embedded audio.
- * Uses queue-based approach for reliability (lipsync takes 30-120s per clip).
+ * Uses queue-based approach since lipsync can take 30-120s per clip.
  */
 async function createLipsyncVideo(
   videoUrl: string,
@@ -324,9 +336,10 @@ async function createLipsyncVideo(
   maxWaitMs = 360000 // 6 minutes max
 ): Promise<{ video_url: string }> {
   const apiKey = getApiKey();
+  const modelId = 'veed/lipsync';
 
   // Submit job to fal queue
-  const submitRes = await fetch(`${FAL_QUEUE_BASE}/fal-ai/sync-lipsync/v2`, {
+  const submitRes = await fetch(`${FAL_QUEUE_BASE}/${modelId}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -344,10 +357,9 @@ async function createLipsyncVideo(
   }
 
   const { request_id } = await submitRes.json();
-  console.log(`[Lipsync] Job submitted: ${request_id}`);
+  console.log(`[Lipsync] VEED job submitted: ${request_id}`);
 
   // Poll for completion
-  // Note: status/result paths use base model path WITHOUT /v2 (fal.ai quirk)
   const startTime = Date.now();
   const pollInterval = 3000;
 
@@ -356,7 +368,7 @@ async function createLipsyncVideo(
 
     try {
       const statusRes = await fetch(
-        `${FAL_QUEUE_BASE}/fal-ai/sync-lipsync/requests/${request_id}/status`,
+        `${FAL_QUEUE_BASE}/${modelId}/requests/${request_id}/status`,
         { headers: { 'Authorization': `Key ${apiKey}` } }
       );
 
@@ -370,11 +382,10 @@ async function createLipsyncVideo(
       console.log(`[Lipsync] Status: ${statusData.status} (${elapsed}s)`);
 
       if (statusData.status === 'COMPLETED') {
-        // Small delay before fetching result (avoids race condition)
         await new Promise((r) => setTimeout(r, 500));
 
         const resultRes = await fetch(
-          `${FAL_QUEUE_BASE}/fal-ai/sync-lipsync/requests/${request_id}`,
+          `${FAL_QUEUE_BASE}/${modelId}/requests/${request_id}`,
           { headers: { 'Authorization': `Key ${apiKey}` } }
         );
 
@@ -401,7 +412,6 @@ async function createLipsyncVideo(
 
       // IN_QUEUE or IN_PROGRESS → keep polling
     } catch (err) {
-      // Re-throw lipsync-specific errors
       if (err instanceof Error && (err.message.includes('Lipsync') || err.message.includes('lipsync'))) {
         throw err;
       }
