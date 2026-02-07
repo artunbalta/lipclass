@@ -69,7 +69,7 @@ export function Sidebar({ role }: SidebarProps) {
         'flex items-center h-16 px-4 border-b border-border',
         collapsed ? 'justify-center' : 'justify-between'
       )}>
-        <Logo size="md" showText={!collapsed} />
+        <Logo size={collapsed ? "sm" : "md"} />
         <Button
           variant="ghost"
           size="icon"
@@ -88,10 +88,10 @@ export function Sidebar({ role }: SidebarProps) {
       <nav className="flex-1 overflow-y-auto py-4 px-3">
         <ul className="space-y-1">
           {navItems.map((item) => {
-            const isActive = pathname === item.href || 
-              (item.href !== '/dashboard/teacher' && 
-               item.href !== '/dashboard/student' && 
-               pathname.startsWith(item.href));
+            const isActive = pathname === item.href ||
+              (item.href !== '/dashboard/teacher' &&
+                item.href !== '/dashboard/student' &&
+                pathname.startsWith(item.href));
 
             return (
               <li key={item.href}>
@@ -168,11 +168,11 @@ export function Sidebar({ role }: SidebarProps) {
               >
                 <p className="text-sm font-medium truncate">{user?.name}</p>
                 <p className="text-xs text-muted-foreground truncate">
-                  {role === 'teacher' && 'subject' in (user || {}) 
-                    ? (user as { subject: string }).subject 
+                  {role === 'teacher' && 'subject' in (user || {})
+                    ? (user as { subject: string }).subject
                     : role === 'student' && 'grade' in (user || {})
-                    ? (user as { grade: string }).grade
-                    : ''}
+                      ? (user as { grade: string }).grade
+                      : ''}
                 </p>
               </motion.div>
             )}

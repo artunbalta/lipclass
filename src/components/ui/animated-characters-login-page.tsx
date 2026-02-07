@@ -20,8 +20,8 @@ interface PupilProps {
   forceLookY?: number;
 }
 
-const Pupil = ({ 
-  size = 12, 
+const Pupil = ({
+  size = 12,
   maxDistance = 5,
   pupilColor = "black",
   forceLookX,
@@ -94,9 +94,9 @@ interface EyeBallProps {
   forceLookY?: number;
 }
 
-const EyeBall = ({ 
-  size = 48, 
-  pupilSize = 16, 
+const EyeBall = ({
+  size = 48,
+  pupilSize = 16,
   maxDistance = 10,
   eyeColor = "white",
   pupilColor = "black",
@@ -236,10 +236,10 @@ const DEFAULT_SHAPES: CharacterShapes = {
   },
 };
 
-function LoginPage({ 
+function LoginPage({
   colors = DEFAULT_COLORS,
-  shapes = DEFAULT_SHAPES 
-}: { 
+  shapes = DEFAULT_SHAPES
+}: {
   colors?: CharacterColors;
   shapes?: CharacterShapes;
 }) {
@@ -373,7 +373,7 @@ function LoginPage({
     setIsLoading(true);
 
     const success = await login(email, password);
-    
+
     if (success) {
       const user = useAuthStore.getState().user;
       showToast.success('Giriş başarılı!', `Hoş geldin, ${user?.name?.split(' ')[0]}!`);
@@ -393,20 +393,20 @@ function LoginPage({
       {/* Left Content Section */}
       <div className="relative hidden lg:flex flex-col justify-between bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-12 text-primary-foreground">
         <div className="relative z-20">
-          <Logo size="md" showText={true} className="text-primary-foreground" />
+          <Logo size="md" variant="light" />
         </div>
 
         <div className="relative z-20 flex items-end justify-center h-[500px]">
           {/* Cartoon Characters */}
           <div className="relative" style={{ width: '550px', height: '400px' }}>
             {/* Primary (Indigo) tall rectangle character - Back layer */}
-            <div 
+            <div
               ref={primaryRef}
               className="absolute bottom-0 transition-all duration-700 ease-in-out"
               style={{
                 left: shapes.primary.left,
                 width: shapes.primary.width,
-                height: (isTyping || (password.length > 0 && !showPassword)) 
+                height: (isTyping || (password.length > 0 && !showPassword))
                   ? (shapes.primary.heightTyping || shapes.primary.height)
                   : shapes.primary.height,
                 backgroundColor: colors.primary,
@@ -415,35 +415,35 @@ function LoginPage({
                 transform: (password.length > 0 && showPassword)
                   ? `skewX(0deg)`
                   : (isTyping || (password.length > 0 && !showPassword))
-                    ? `skewX(${(primaryPos.bodySkew || 0) - 12}deg) translateX(40px)` 
+                    ? `skewX(${(primaryPos.bodySkew || 0) - 12}deg) translateX(40px)`
                     : `skewX(${primaryPos.bodySkew || 0}deg)`,
                 transformOrigin: 'bottom center',
               }}
             >
               {/* Eyes */}
-              <div 
+              <div
                 className="absolute flex gap-8 transition-all duration-700 ease-in-out"
                 style={{
                   left: (password.length > 0 && showPassword) ? `${20}px` : isLookingAtEachOther ? `${55}px` : `${45 + primaryPos.faceX}px`,
                   top: (password.length > 0 && showPassword) ? `${35}px` : isLookingAtEachOther ? `${65}px` : `${40 + primaryPos.faceY}px`,
                 }}
               >
-                <EyeBall 
-                  size={18} 
-                  pupilSize={7} 
-                  maxDistance={5} 
-                  eyeColor="white" 
-                  pupilColor={colors.pupil} 
+                <EyeBall
+                  size={18}
+                  pupilSize={7}
+                  maxDistance={5}
+                  eyeColor="white"
+                  pupilColor={colors.pupil}
                   isBlinking={isPrimaryBlinking}
                   forceLookX={(password.length > 0 && showPassword) ? (isPrimaryPeeking ? 4 : -4) : isLookingAtEachOther ? 3 : undefined}
                   forceLookY={(password.length > 0 && showPassword) ? (isPrimaryPeeking ? 5 : -4) : isLookingAtEachOther ? 4 : undefined}
                 />
-                <EyeBall 
-                  size={18} 
-                  pupilSize={7} 
-                  maxDistance={5} 
-                  eyeColor="white" 
-                  pupilColor={colors.pupil} 
+                <EyeBall
+                  size={18}
+                  pupilSize={7}
+                  maxDistance={5}
+                  eyeColor="white"
+                  pupilColor={colors.pupil}
                   isBlinking={isPrimaryBlinking}
                   forceLookX={(password.length > 0 && showPassword) ? (isPrimaryPeeking ? 4 : -4) : isLookingAtEachOther ? 3 : undefined}
                   forceLookY={(password.length > 0 && showPassword) ? (isPrimaryPeeking ? 5 : -4) : isLookingAtEachOther ? 4 : undefined}
@@ -452,7 +452,7 @@ function LoginPage({
             </div>
 
             {/* Black tall rectangle character - Middle layer */}
-            <div 
+            <div
               ref={blackRef}
               className="absolute bottom-0 transition-all duration-700 ease-in-out"
               style={{
@@ -469,35 +469,35 @@ function LoginPage({
                   : isLookingAtEachOther
                     ? `skewX(${(blackPos.bodySkew || 0) * 1.5 + 10}deg) translateX(20px)`
                     : (isTyping || (password.length > 0 && !showPassword))
-                      ? `skewX(${(blackPos.bodySkew || 0) * 1.5}deg)` 
+                      ? `skewX(${(blackPos.bodySkew || 0) * 1.5}deg)`
                       : `skewX(${blackPos.bodySkew || 0}deg)`,
                 transformOrigin: 'bottom center',
               }}
             >
               {/* Eyes */}
-              <div 
+              <div
                 className="absolute flex gap-6 transition-all duration-700 ease-in-out"
                 style={{
                   left: (password.length > 0 && showPassword) ? `${10}px` : isLookingAtEachOther ? `${32}px` : `${26 + blackPos.faceX}px`,
                   top: (password.length > 0 && showPassword) ? `${28}px` : isLookingAtEachOther ? `${12}px` : `${32 + blackPos.faceY}px`,
                 }}
               >
-                <EyeBall 
-                  size={16} 
-                  pupilSize={6} 
-                  maxDistance={4} 
-                  eyeColor="white" 
-                  pupilColor={colors.pupil} 
+                <EyeBall
+                  size={16}
+                  pupilSize={6}
+                  maxDistance={4}
+                  eyeColor="white"
+                  pupilColor={colors.pupil}
                   isBlinking={isBlackBlinking}
                   forceLookX={(password.length > 0 && showPassword) ? -4 : isLookingAtEachOther ? 0 : undefined}
                   forceLookY={(password.length > 0 && showPassword) ? -4 : isLookingAtEachOther ? -4 : undefined}
                 />
-                <EyeBall 
-                  size={16} 
-                  pupilSize={6} 
-                  maxDistance={4} 
-                  eyeColor="white" 
-                  pupilColor={colors.pupil} 
+                <EyeBall
+                  size={16}
+                  pupilSize={6}
+                  maxDistance={4}
+                  eyeColor="white"
+                  pupilColor={colors.pupil}
                   isBlinking={isBlackBlinking}
                   forceLookX={(password.length > 0 && showPassword) ? -4 : isLookingAtEachOther ? 0 : undefined}
                   forceLookY={(password.length > 0 && showPassword) ? -4 : isLookingAtEachOther ? -4 : undefined}
@@ -506,7 +506,7 @@ function LoginPage({
             </div>
 
             {/* Secondary (Orange) semi-circle character - Front left */}
-            <div 
+            <div
               ref={secondaryRef}
               className="absolute bottom-0 transition-all duration-700 ease-in-out"
               style={{
@@ -521,7 +521,7 @@ function LoginPage({
               }}
             >
               {/* Eyes - just pupils, no white */}
-              <div 
+              <div
                 className="absolute flex gap-8 transition-all duration-200 ease-out"
                 style={{
                   left: (password.length > 0 && showPassword) ? `${50}px` : `${82 + (secondaryPos.faceX || 0)}px`,
@@ -534,7 +534,7 @@ function LoginPage({
             </div>
 
             {/* Accent (Green) tall rectangle character - Front right */}
-            <div 
+            <div
               ref={accentRef}
               className="absolute bottom-0 transition-all duration-700 ease-in-out"
               style={{
@@ -549,7 +549,7 @@ function LoginPage({
               }}
             >
               {/* Eyes - just pupils, no white */}
-              <div 
+              <div
                 className="absolute flex gap-6 transition-all duration-200 ease-out"
                 style={{
                   left: (password.length > 0 && showPassword) ? `${20}px` : `${52 + (accentPos.faceX || 0)}px`,
@@ -560,7 +560,7 @@ function LoginPage({
                 <Pupil size={12} maxDistance={5} pupilColor={colors.pupil} forceLookX={(password.length > 0 && showPassword) ? -5 : undefined} forceLookY={(password.length > 0 && showPassword) ? -4 : undefined} />
               </div>
               {/* Horizontal line for mouth */}
-              <div 
+              <div
                 className="absolute w-20 h-[4px] rounded-full transition-all duration-200 ease-out"
                 style={{
                   backgroundColor: colors.pupil,
@@ -672,10 +672,10 @@ function LoginPage({
               </div>
             )}
 
-            <Button 
-              type="submit" 
-              className="w-full h-12 text-base font-medium" 
-              size="lg" 
+            <Button
+              type="submit"
+              className="w-full h-12 text-base font-medium"
+              size="lg"
               disabled={isLoading}
             >
               {isLoading ? "Giriş yapılıyor..." : "Giriş Yap"}
@@ -684,8 +684,8 @@ function LoginPage({
 
           {/* Social Login */}
           <div className="mt-6">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="w-full h-12 bg-background border-border/60 hover:bg-accent"
               type="button"
               disabled

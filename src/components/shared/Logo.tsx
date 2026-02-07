@@ -1,79 +1,55 @@
 'use client';
 
-import { Sparkles } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { cn } from '@/lib/utils';
 
 interface LogoProps {
   className?: string;
-  showText?: boolean;
   size?: 'sm' | 'md' | 'lg';
+  variant?: 'light' | 'dark'; // 'dark' = black logo for white bg, 'light' = white logo for dark bg
 }
 
-function ChalkIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-      <g transform="translate(12, 12) rotate(-45)">
-        <line x1="-8" y1="-2" x2="8" y2="-2" stroke="currentColor" strokeWidth="1.5" />
-        <line x1="-8" y1="2" x2="8" y2="2" stroke="currentColor" strokeWidth="1.5" />
-        <ellipse cx="-8" cy="0" rx="1.5" ry="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
-        <ellipse cx="8" cy="0" rx="1.5" ry="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
-      </g>
-    </svg>
-  );
-}
-
-export function Logo({ className, showText = true, size = 'md' }: LogoProps) {
+export function Logo({ className, size = 'md', variant = 'dark' }: LogoProps) {
   const sizes = {
     sm: {
-      icon: 'w-6 h-6',
-      text: 'text-lg',
-      sparkle: 'w-2 h-2',
+      logoWidth: 100,
+      logoHeight: 40,
     },
     md: {
-      icon: 'w-8 h-8',
-      text: 'text-xl',
-      sparkle: 'w-3 h-3',
+      logoWidth: 130,
+      logoHeight: 52,
     },
     lg: {
-      icon: 'w-10 h-10',
-      text: 'text-2xl',
-      sparkle: 'w-4 h-4',
+      logoWidth: 170,
+      logoHeight: 68,
     },
   };
 
+  // Dark variant = black chalk (for white backgrounds)
+  // Light variant = white chalk (for dark backgrounds)
+  const logoSrc = variant === 'light' ? '/chalk-logo-light.png' : '/chalk-logo-dark.png';
+
   return (
-    <Link href="/" className={cn('flex items-center gap-2 group', className)}>
-      <div className="relative">
-        <div className={cn(
-          'flex items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/80 p-2 transition-all duration-300 group-hover:scale-105 group-hover:shadow-lg group-hover:shadow-primary/25',
-          sizes[size].icon === 'w-10 h-10' && 'p-2.5'
-        )}>
-          <ChalkIcon className={cn('text-primary-foreground', sizes[size].icon)} />
-        </div>
-        <Sparkles
-          className={cn(
-            'absolute -top-1 -right-1 text-accent animate-pulse',
-            sizes[size].sparkle
-          )}
+    <Link href="/" className={cn('flex items-center group', className)}>
+      <div className="flex flex-col">
+        <Image
+          src={logoSrc}
+          alt="Chalk"
+          width={sizes[size].logoWidth}
+          height={sizes[size].logoHeight}
+          className="object-contain transition-transform duration-300 group-hover:scale-105"
+          priority
         />
-      </div>
-      {showText && (
-        <div className="flex flex-col">
+        {size === 'lg' && (
           <span className={cn(
-            'font-bold tracking-tight leading-none',
-            sizes[size].text
+            "text-xs font-medium",
+            variant === 'light' ? 'text-white/70' : 'text-muted-foreground'
           )}>
-            <span className="text-primary">Chalk</span>
+            AI ile Eğitim Videoları
           </span>
-          {size === 'lg' && (
-            <span className="text-xs text-muted-foreground font-medium">
-              AI ile Eğitim Videoları
-            </span>
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </Link>
   );
 }
-
