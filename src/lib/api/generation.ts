@@ -1,129 +1,213 @@
-// Video Generation Service
-// Orchestrates LLM → TTS → Lipsync flow using Fal AI
+// Slide-based Lesson Generation Service
+// Pipeline: LLM (10 slides) → TTS (per slide) → Lipsync (per slide) → Save to DB
 
-import { generateContentWithLLM, textToSpeech, createLipsyncVideo } from './fal';
-import { getReferenceVideoUrl, uploadFile } from './storage';
 import { updateVideo } from './videos';
+import type { Slide, SlidesData } from '@/types';
 
-export type GenerationProgress = 
+export type GenerationProgress =
   | { stage: 'idle' }
-  | { stage: 'generating_content'; progress: number }
-  | { stage: 'creating_audio'; progress: number }
-  | { stage: 'synthesizing_video'; progress: number }
-  | { stage: 'uploading'; progress: number }
-  | { stage: 'completed'; videoUrl: string; thumbnailUrl?: string }
+  | { stage: 'generating_slides'; progress: number }
+  | { stage: 'creating_audio'; progress: number; currentSlide?: number; totalSlides?: number }
+  | { stage: 'creating_lipsync'; progress: number; currentSlide?: number; totalSlides?: number }
+  | { stage: 'saving'; progress: number }
+  | { stage: 'completed' }
   | { stage: 'failed'; error: string };
 
 export interface GenerationOptions {
   videoId: string;
   teacherId: string;
+  topic: string;
+  description: string;
   prompt: string;
   language?: 'tr' | 'en';
   tone?: 'formal' | 'friendly' | 'energetic';
+  includesProblemSolving?: boolean;
+  problemCount?: number;
+  difficulty?: string;
+  referenceVideoUrl?: string; // Teacher's reference video for lipsync
   onProgress?: (progress: GenerationProgress) => void;
 }
 
 /**
- * Generate video content using AI pipeline:
- * 1. LLM generates lesson content from prompt
- * 2. TTS converts content to speech
- * 3. Lipsync syncs speech with reference video
- * 4. Upload final video to Supabase Storage
+ * Generate slide-based lesson using full AI pipeline:
+ * 1. LLM generates 10 structured slides with narration text
+ * 2. TTS converts each slide's narration to audio
+ * 3. Lipsync syncs teacher's reference video to each slide's audio
+ * 4. Save slides_data to database
  */
-export async function generateVideo(options: GenerationOptions): Promise<string> {
-  const { videoId, teacherId, prompt, language = 'tr', tone = 'friendly', onProgress } = options;
+export async function generateVideo(options: GenerationOptions): Promise<SlidesData> {
+  const {
+    videoId,
+    topic,
+    description,
+    prompt,
+    language = 'tr',
+    tone = 'friendly',
+    includesProblemSolving = false,
+    problemCount,
+    difficulty,
+    referenceVideoUrl,
+    onProgress,
+  } = options;
 
   try {
-    // Stage 1: Generate content with LLM
-    onProgress?.({ stage: 'generating_content', progress: 10 });
-    
-    const enhancedPrompt = buildEnhancedPrompt(prompt, language, tone);
-    const lessonContent = await generateContentWithLLM(enhancedPrompt, {
-      maxTokens: 2000,
-      temperature: 0.7,
+    // Update video status to processing
+    await updateVideo(videoId, { status: 'processing' } as any);
+
+    // ━━━ Stage 1: Generate slides with LLM (0-10%) ━━━
+    onProgress?.({ stage: 'generating_slides', progress: 2 });
+
+    const slidesResponse = await fetch('/api/generate-video', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        step: 'slides',
+        topic,
+        description,
+        prompt,
+        language,
+        tone,
+        includesProblemSolving,
+        problemCount,
+        difficulty,
+      }),
     });
 
-    onProgress?.({ stage: 'generating_content', progress: 30 });
+    if (!slidesResponse.ok) {
+      const err = await slidesResponse.json().catch(() => ({}));
+      throw new Error(err?.error || 'Slayt içeriği oluşturulamadı');
+    }
 
-    // Update video status in database
-    await updateVideo(videoId, {
-      status: 'processing',
-    } as any);
+    const { slides } = (await slidesResponse.json()) as { slides: Slide[] };
 
-    // Stage 2: Convert text to speech
-    onProgress?.({ stage: 'creating_audio', progress: 40 });
-    
-    const ttsResponse = await textToSpeech(lessonContent, {
-      language,
-      voice: language === 'tr' ? 'tr-TR-DuyguNeural' : 'en-US-JennyNeural',
-      speed: tone === 'energetic' ? 1.1 : tone === 'formal' ? 0.95 : 1.0,
+    if (!slides || slides.length === 0) {
+      throw new Error('LLM slayt üretemedi');
+    }
+
+    console.log(`[Generation] ${slides.length} slides generated`);
+    onProgress?.({ stage: 'generating_slides', progress: 10 });
+
+    // ━━━ Stage 2: Generate TTS for all slides (10-25%) ━━━
+    onProgress?.({ stage: 'creating_audio', progress: 10, currentSlide: 0, totalSlides: slides.length });
+
+    const ttsBatchResponse = await fetch('/api/generate-video', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        step: 'tts_batch',
+        slides: slides.map((s) => ({
+          slideNumber: s.slideNumber,
+          narrationText: s.narrationText,
+        })),
+        language,
+      }),
     });
 
-    onProgress?.({ stage: 'creating_audio', progress: 70 });
-
-    if (!ttsResponse.audio_url) {
-      throw new Error('TTS failed: No audio URL returned');
+    if (!ttsBatchResponse.ok) {
+      const err = await ttsBatchResponse.json().catch(() => ({}));
+      throw new Error(err?.error || 'Ses dosyaları oluşturulamadı');
     }
 
-    // Stage 3: Get reference video URL
-    const referenceVideoUrl = await getReferenceVideoUrl(teacherId);
-    
-    if (!referenceVideoUrl) {
-      throw new Error('Reference video not found. Please upload a reference video first.');
-    }
+    const { audioResults } = (await ttsBatchResponse.json()) as {
+      audioResults: Array<{ slideNumber: number; audio_url: string }>;
+    };
 
-    // Stage 4: Create lipsync video
-    onProgress?.({ stage: 'synthesizing_video', progress: 75 });
-    
-    const lipsyncResponse = await createLipsyncVideo(
-      referenceVideoUrl,
-      ttsResponse.audio_url,
-      {
-        syncMode: 'cut_off',
+    console.log(`[Generation] TTS completed for ${audioResults.length} slides`);
+    onProgress?.({ stage: 'creating_audio', progress: 25, currentSlide: slides.length, totalSlides: slides.length });
+
+    // Merge audio URLs into slides
+    const slidesWithAudio: Slide[] = slides.map((slide) => {
+      const audioResult = audioResults.find((a) => a.slideNumber === slide.slideNumber);
+      return {
+        ...slide,
+        audioUrl: audioResult?.audio_url || '',
+      };
+    });
+
+    // ━━━ Stage 3: Lipsync for each slide (25-93%) ━━━
+    // Each slide gets its own lipsync video (reference video + TTS audio → synced lips)
+    if (referenceVideoUrl) {
+      const slidesWithAudioCount = slidesWithAudio.filter((s) => s.audioUrl).length;
+      let lipsyncDone = 0;
+
+      for (let i = 0; i < slidesWithAudio.length; i++) {
+        const slide = slidesWithAudio[i];
+        if (!slide.audioUrl) {
+          console.log(`[Lipsync] Slide ${slide.slideNumber} skipped (no audio)`);
+          continue;
+        }
+
+        onProgress?.({
+          stage: 'creating_lipsync',
+          progress: 25 + (lipsyncDone / slidesWithAudioCount) * 68,
+          currentSlide: i + 1,
+          totalSlides: slidesWithAudio.length,
+        });
+
+        try {
+          console.log(`[Lipsync] Starting slide ${slide.slideNumber}...`);
+
+          const lipsyncResponse = await fetch('/api/generate-video', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              step: 'lipsync',
+              video_url: referenceVideoUrl,
+              audio_url: slide.audioUrl,
+            }),
+          });
+
+          if (lipsyncResponse.ok) {
+            const { video_url } = (await lipsyncResponse.json()) as { video_url: string };
+            if (video_url) {
+              slide.videoUrl = video_url;
+              console.log(`[Lipsync] Slide ${slide.slideNumber} completed`);
+            }
+          } else {
+            const err = await lipsyncResponse.json().catch(() => ({}));
+            console.error(`[Lipsync] Slide ${slide.slideNumber} failed:`, err?.error || lipsyncResponse.statusText);
+          }
+        } catch (err) {
+          console.error(`[Lipsync] Slide ${slide.slideNumber} error:`, err);
+          // Continue - slide will fall back to reference video loop in player
+        }
+
+        lipsyncDone++;
+        onProgress?.({
+          stage: 'creating_lipsync',
+          progress: 25 + (lipsyncDone / slidesWithAudioCount) * 68,
+          currentSlide: i + 1,
+          totalSlides: slidesWithAudio.length,
+        });
       }
-    );
 
-    onProgress?.({ stage: 'synthesizing_video', progress: 95 });
-
-    if (!lipsyncResponse.video_url) {
-      throw new Error('Lipsync failed: No video URL returned');
+      const successCount = slidesWithAudio.filter((s) => s.videoUrl).length;
+      console.log(`[Generation] Lipsync completed: ${successCount}/${slidesWithAudioCount} slides`);
+    } else {
+      console.log('[Generation] No reference video - skipping lipsync');
     }
 
-    // Stage 5: Download generated video and upload to Supabase
-    onProgress?.({ stage: 'uploading', progress: 95 });
-    
-    const videoBlob = await fetch(lipsyncResponse.video_url).then(res => res.blob());
-    const videoFile = new File([videoBlob], `generated-${videoId}.mp4`, { type: 'video/mp4' });
-    
-    const uploadedVideoUrl = await uploadFile(
-      'generated-videos',
-      videoFile,
-      `${teacherId}/${videoId}.mp4`
-    );
+    const slidesData: SlidesData = { slides: slidesWithAudio };
 
-    onProgress?.({ stage: 'uploading', progress: 98 });
+    // ━━━ Stage 4: Save to database (93-100%) ━━━
+    onProgress?.({ stage: 'saving', progress: 95 });
 
-    // Generate thumbnail (extract first frame or use a placeholder)
-    // TODO: Extract thumbnail from video or generate one
-
-    // Update video with final URL and status
     await updateVideo(videoId, {
-      videoUrl: uploadedVideoUrl,
+      slidesData,
       status: 'published',
-      duration: lipsyncResponse.duration || Math.ceil(videoBlob.size / (1024 * 1024)), // Rough estimate
+      duration: slides.length * 30, // Rough estimate: ~30 sec per slide
     } as any);
 
-    onProgress?.({ stage: 'completed', videoUrl: uploadedVideoUrl });
+    console.log('[Generation] Slides saved to database');
+    onProgress?.({ stage: 'completed' });
 
-    return uploadedVideoUrl;
+    return slidesData;
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    
+    const errorMessage = error instanceof Error ? error.message : 'Bilinmeyen hata';
+
     // Update video status to failed
     try {
-      await updateVideo(videoId, {
-        status: 'failed',
-      } as any);
+      await updateVideo(videoId, { status: 'failed' } as any);
     } catch (updateError) {
       console.error('Failed to update video status:', updateError);
     }
@@ -131,37 +215,4 @@ export async function generateVideo(options: GenerationOptions): Promise<string>
     onProgress?.({ stage: 'failed', error: errorMessage });
     throw error;
   }
-}
-
-/**
- * Build enhanced prompt for LLM
- */
-function buildEnhancedPrompt(
-  userPrompt: string,
-  language: 'tr' | 'en',
-  tone: 'formal' | 'friendly' | 'energetic'
-): string {
-  const toneInstructions = {
-    tr: {
-      formal: 'Profesyonel ve resmi bir ton kullan. Eğitim dilini kullan.',
-      friendly: 'Samimi ve sıcak bir ton kullan. Öğrenci dostu dil kullan.',
-      energetic: 'Enerjik ve dinamik bir ton kullan. Öğrencileri heyecanlandır.',
-    },
-    en: {
-      formal: 'Use a professional and formal tone. Use academic language.',
-      friendly: 'Use a warm and friendly tone. Use student-friendly language.',
-      energetic: 'Use an energetic and dynamic tone. Excite the students.',
-    },
-  };
-
-  const toneInstruction = toneInstructions[language][tone];
-
-  return `${userPrompt}
-
-${language === 'tr' ? 'Yukarıdaki konuyu bir ders videosu için metne dönüştür. Metin' : 'Convert the above topic into text for an educational video. The text should'}: 
-- ${toneInstruction}
-- ${language === 'tr' ? 'Açık ve anlaşılır olmalı' : 'Be clear and understandable'}
-- ${language === 'tr' ? 'Öğrencilerin seviyesine uygun olmalı' : 'Be appropriate for student level'}
-- ${language === 'tr' ? 'Örnekler ve açıklamalar içermeli' : 'Include examples and explanations'}
-- ${language === 'tr' ? 'Doğrudan konuşma tonunda yazılmalı (video anlatımı için)' : 'Be written in direct speech tone (for video narration)'}`;
 }

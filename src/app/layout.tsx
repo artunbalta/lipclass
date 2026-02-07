@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import LiquidEther from "@/components/ui/LiquidEther";
+import "katex/dist/katex.min.css";
 import "./globals.css";
 
 const plusJakartaSans = Plus_Jakarta_Sans({

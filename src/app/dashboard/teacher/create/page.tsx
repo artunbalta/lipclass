@@ -9,12 +9,8 @@ import {
   Loader2, 
   Check,
   BookOpen,
-  GraduationCap,
   FileText,
-  Target,
-  Lightbulb,
   Settings2,
-  Sparkles
 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -27,9 +23,10 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useVideoStore } from '@/stores/video-store';
 import { showToast } from '@/lib/utils/toast';
-import { SUBJECTS, GRADES, PROMPT_TEMPLATES } from '@/lib/constants';
+import { SUBJECTS, GRADES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { generateVideo, GenerationProgress } from '@/lib/api/generation';
+import { getReferenceVideoUrl } from '@/lib/api/storage';
 import { useAuthStore } from '@/stores/auth-store';
 
 const createVideoSchema = z.object({
@@ -37,7 +34,7 @@ const createVideoSchema = z.object({
   grade: z.string().min(1, 'Sınıf seçin'),
   topic: z.string().min(3, 'Konu en az 3 karakter olmalı'),
   description: z.string().min(10, 'Açıklama en az 10 karakter olmalı'),
-  prompt: z.string().min(20, 'Prompt en az 20 karakter olmalı'),
+  prompt: z.string().optional().default(''),
   tone: z.enum(['formal', 'friendly', 'energetic']),
   includesProblemSolving: z.boolean(),
   problemCount: z.number().min(1).max(10),
@@ -51,8 +48,7 @@ type CreateVideoForm = z.infer<typeof createVideoSchema>;
 const steps = [
   { id: 1, title: 'Ders Bilgileri', icon: BookOpen },
   { id: 2, title: 'İçerik', icon: FileText },
-  { id: 3, title: 'AI Prompt', icon: Sparkles },
-  { id: 4, title: 'Ayarlar', icon: Settings2 },
+  { id: 3, title: 'Ayarlar', icon: Settings2 },
 ];
 
 export default function CreateVideoPage() {
@@ -96,7 +92,7 @@ export default function CreateVideoPage() {
     }
 
     setIsCreating(true);
-    setGenerationProgress({ stage: 'generating_content', progress: 0 });
+    setGenerationProgress({ stage: 'generating_slides', progress: 0 });
 
     try {
       // Step 1: Create video record in database
@@ -106,35 +102,43 @@ export default function CreateVideoPage() {
         keyConcepts: [],
       });
 
-      // Step 2: Start video generation (LLM → TTS → Lipsync)
-      // This runs in the background
+      // Step 2: Fetch teacher's reference video URL for lipsync
+      const refVideoUrl = await getReferenceVideoUrl(user.id);
+      if (refVideoUrl) {
+        console.log('[Create] Reference video found for lipsync');
+      } else {
+        console.warn('[Create] No reference video - lipsync will be skipped');
+      }
+
+      // Step 3: Start full pipeline (LLM → TTS → Lipsync → Save)
       generateVideo({
         videoId: video.id,
         teacherId: user.id,
-        prompt: data.prompt,
+        topic: data.topic,
+        description: data.description,
+        prompt: data.prompt || '',
         language: data.language,
         tone: data.tone,
+        includesProblemSolving: data.includesProblemSolving,
+        problemCount: data.problemCount,
+        difficulty: data.difficulty,
+        referenceVideoUrl: refVideoUrl || undefined,
         onProgress: (progress) => {
           setGenerationProgress(progress);
-          
-          // Show toast for key stages
-          if (progress.stage === 'generating_content' && progress.progress === 30) {
-            showToast.info('İçerik oluşturuluyor...', 'AI ders metnini hazırlıyor.');
-          } else if (progress.stage === 'creating_audio') {
-            showToast.info('Ses oluşturuluyor...', 'Metin sese dönüştürülüyor.');
-          } else if (progress.stage === 'synthesizing_video') {
-            showToast.info('Video senkronize ediliyor...', 'Ses ve video eşleştiriliyor.');
-          }
         },
-      }).then((videoUrl) => {
-        setGenerationProgress({ stage: 'completed', videoUrl });
-        showToast.success('Video hazır!', 'Videonuz başarıyla oluşturuldu.');
+      }).then(() => {
+        setGenerationProgress({ stage: 'completed' });
+        showToast.success('Ders hazır!', 'Ders sunumunuz başarıyla oluşturuldu.');
         setTimeout(() => {
           router.push('/dashboard/teacher/videos');
         }, 2000);
       }).catch((error) => {
-        console.error('Video generation error:', error);
-        showToast.error('Generation hatası', error instanceof Error ? error.message : 'Video oluşturulurken bir hata oluştu.');
+        console.error('Generation error:', error);
+        setGenerationProgress({
+          stage: 'failed',
+          error: error instanceof Error ? error.message : 'Ders oluşturulurken bir hata oluştu.',
+        });
+        showToast.error('Generation hatası', error instanceof Error ? error.message : 'Hata oluştu.');
       });
 
       setIsCreating(false);
@@ -145,33 +149,36 @@ export default function CreateVideoPage() {
         stage: 'failed', 
         error: error instanceof Error ? error.message : 'Bilinmeyen hata' 
       });
-      showToast.error('Hata oluştu', 'Video oluşturulurken bir sorun yaşandı. Lütfen tekrar deneyin.');
+      showToast.error('Hata oluştu', 'Ders oluşturulurken bir sorun yaşandı. Lütfen tekrar deneyin.');
     }
   };
 
-  const handleTemplateSelect = (template: string) => {
-    const filled = template
-      .replace('{konu}', watchAll.topic || '[Konu]')
-      .replace('{sinif}', watchAll.grade || '[Sınıf]');
-    setValue('prompt', filled);
-  };
-
-  const nextStep = () => setCurrentStep((prev) => Math.min(prev + 1, 4));
+  const nextStep = () => setCurrentStep((prev) => Math.min(prev + 1, 3));
   const prevStep = () => setCurrentStep((prev) => Math.max(prev - 1, 1));
 
   if (isSuccess) {
     const getProgressLabel = () => {
       switch (generationProgress.stage) {
-        case 'generating_content':
-          return 'İçerik oluşturuluyor...';
-        case 'creating_audio':
-          return 'Ses oluşturuluyor...';
-        case 'synthesizing_video':
-          return 'Video senkronize ediliyor...';
-        case 'uploading':
-          return 'Video yükleniyor...';
+        case 'generating_slides':
+          return 'Slaytlar oluşturuluyor...';
+        case 'creating_audio': {
+          const audioProgress = generationProgress as { currentSlide?: number; totalSlides?: number };
+          if (audioProgress.currentSlide && audioProgress.totalSlides) {
+            return `Ses oluşturuluyor (${audioProgress.currentSlide}/${audioProgress.totalSlides})...`;
+          }
+          return 'Ses dosyaları oluşturuluyor...';
+        }
+        case 'creating_lipsync': {
+          const lipsyncProgress = generationProgress as { currentSlide?: number; totalSlides?: number };
+          if (lipsyncProgress.currentSlide && lipsyncProgress.totalSlides) {
+            return `Lipsync oluşturuluyor (${lipsyncProgress.currentSlide}/${lipsyncProgress.totalSlides})...`;
+          }
+          return 'Video senkronizasyonu yapılıyor...';
+        }
+        case 'saving':
+          return 'Kaydediliyor...';
         case 'completed':
-          return 'Video hazır!';
+          return 'Ders hazır!';
         case 'failed':
           return 'Hata oluştu';
         default:
@@ -197,9 +204,9 @@ export default function CreateVideoPage() {
               <div className="w-20 h-20 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-6">
                 <Check className="w-10 h-10 text-emerald-500" />
               </div>
-              <h2 className="text-2xl font-bold mb-2">Video Hazır!</h2>
+              <h2 className="text-2xl font-bold mb-2">Ders Hazır!</h2>
               <p className="text-muted-foreground mb-4">
-                Videonuz başarıyla oluşturuldu. Videolar sayfasına yönlendiriliyorsunuz...
+                Ders sunumunuz başarıyla oluşturuldu. Videolar sayfasına yönlendiriliyorsunuz...
               </p>
             </>
           ) : generationProgress.stage === 'failed' ? (
@@ -222,7 +229,7 @@ export default function CreateVideoPage() {
               </div>
               <h2 className="text-2xl font-bold mb-2">{getProgressLabel()}</h2>
               <p className="text-muted-foreground mb-6">
-                Videonuz hazırlanıyor. Bu işlem birkaç dakika sürebilir.
+                Ders sunumunuz hazırlanıyor. Bu işlem birkaç dakika sürebilir.
               </p>
               
               {/* Progress Bar */}
@@ -379,7 +386,7 @@ export default function CreateVideoPage() {
               <div className="p-6 rounded-xl border border-border bg-card">
                 <h3 className="font-semibold mb-4 flex items-center gap-2">
                   <FileText className="w-5 h-5 text-primary" />
-                  Video İçeriği
+                  Ders İçeriği
                 </h3>
 
                 <div className="space-y-4">
@@ -387,14 +394,40 @@ export default function CreateVideoPage() {
                     <Label htmlFor="description">Ders Açıklaması *</Label>
                     <Textarea
                       id="description"
-                      placeholder="Bu derste neler öğretilecek? Kısa bir açıklama yazın..."
-                      rows={4}
+                      placeholder={"Bu derste neler öğretilecek? Detaylı açıklama yazın.\n\nÖrnek: \"Birinci dereceden denklemlerin çözümünü anlat. Günlük hayattan örnekler ver. Eğlenceli ve samimi bir anlatım olsun.\""}
+                      rows={6}
                       className={errors.description ? 'border-destructive' : ''}
                       {...register('description')}
                     />
                     {errors.description && (
                       <p className="text-xs text-destructive">{errors.description.message}</p>
                     )}
+                    <p className="text-xs text-muted-foreground">
+                      Anlatım stilini de burada belirtebilirsiniz (eğlenceli, öğretici, samimi vb.). Belirtmezseniz detaylı ve samimi bir sunum oluşturulur.
+                    </p>
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-2">
+                    <Label>Anlatım Tonu</Label>
+                    <div className="flex gap-2">
+                      {[
+                        { value: 'formal', label: 'Formal' },
+                        { value: 'friendly', label: 'Samimi' },
+                        { value: 'energetic', label: 'Enerjik' },
+                      ].map((tone) => (
+                        <Button
+                          key={tone.value}
+                          type="button"
+                          variant={watchAll.tone === tone.value ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setValue('tone', tone.value as 'formal' | 'friendly' | 'energetic')}
+                        >
+                          {tone.label}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -412,94 +445,8 @@ export default function CreateVideoPage() {
             </motion.div>
           )}
 
-          {/* Step 3: AI Prompt */}
+          {/* Step 3: Settings */}
           {currentStep === 3 && (
-            <motion.div
-              key="step3"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-6"
-            >
-              <div className="p-6 rounded-xl border border-border bg-card">
-                <h3 className="font-semibold mb-4 flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-primary" />
-                  AI Prompt
-                </h3>
-
-                <div className="mb-4">
-                  <Label className="mb-2 block">Hızlı Şablonlar</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {PROMPT_TEMPLATES.map((template) => (
-                      <Button
-                        key={template.id}
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleTemplateSelect(template.template)}
-                      >
-                        {template.name}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="prompt">İçerik Promptu *</Label>
-                  <Textarea
-                    id="prompt"
-                    placeholder="AI'a videonun içeriği hakkında detaylı talimatlar verin..."
-                    rows={6}
-                    className={errors.prompt ? 'border-destructive' : ''}
-                    {...register('prompt')}
-                  />
-                  {errors.prompt && (
-                    <p className="text-xs text-destructive">{errors.prompt.message}</p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    Detaylı ve açık talimatlar daha iyi sonuç verir.
-                  </p>
-                </div>
-
-                <Separator className="my-4" />
-
-                <div className="space-y-2">
-                  <Label>Anlatım Tonu</Label>
-                  <div className="flex gap-2">
-                    {[
-                      { value: 'formal', label: 'Formal' },
-                      { value: 'friendly', label: 'Samimi' },
-                      { value: 'energetic', label: 'Enerjik' },
-                    ].map((tone) => (
-                      <Button
-                        key={tone.value}
-                        type="button"
-                        variant={watchAll.tone === tone.value ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setValue('tone', tone.value as 'formal' | 'friendly' | 'energetic')}
-                      >
-                        {tone.label}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-between">
-                <Button type="button" variant="outline" onClick={prevStep}>
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Geri
-                </Button>
-                <Button type="button" onClick={nextStep}>
-                  Devam Et
-                  <ArrowLeft className="w-4 h-4 ml-2 rotate-180" />
-                </Button>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Step 4: Settings */}
-          {currentStep === 4 && (
             <motion.div
               key="step4"
               initial={{ opacity: 0, x: 20 }}

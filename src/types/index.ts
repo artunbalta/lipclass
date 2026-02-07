@@ -24,6 +24,21 @@ export interface Student extends User {
   watchedVideos: string[];
 }
 
+// Slide Types
+export interface Slide {
+  slideNumber: number;
+  title: string;
+  content: string; // HTML/KaTeX content
+  bulletPoints: string[];
+  narrationText: string; // What the teacher says for this slide (also used for lipsync)
+  audioUrl?: string; // TTS audio URL for this slide
+  videoUrl?: string; // Per-slide lipsync video URL (future: generated from narrationText + reference video)
+}
+
+export interface SlidesData {
+  slides: Slide[];
+}
+
 // Video Types
 export interface Video {
   id: string;
@@ -36,8 +51,9 @@ export interface Video {
   grade: string;
   topic: string;
   thumbnailUrl: string;
-  videoUrl: string;
-  duration: number; // seconds
+  videoUrl?: string; // Optional - legacy MP4 videos
+  slidesData?: SlidesData; // New slide-based content
+  duration: number; // seconds (sum of all slide audio durations)
   status: 'draft' | 'processing' | 'published' | 'failed';
   viewCount: number;
   createdAt: Date;

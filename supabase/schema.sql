@@ -48,6 +48,7 @@ CREATE TABLE videos (
   difficulty video_difficulty,
   estimated_duration INTEGER, -- in minutes
   language TEXT DEFAULT 'tr', -- 'tr' or 'en'
+  slides_data JSONB, -- Slide-based content: { slides: [{ slideNumber, title, content, bulletPoints, narrationText, audioUrl }] }
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

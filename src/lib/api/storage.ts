@@ -59,6 +59,25 @@ export async function deleteFile(bucket: Bucket, path: string): Promise<void> {
 }
 
 /**
+ * Create a signed URL for a storage path (works with private buckets)
+ */
+export async function createSignedUrl(
+  bucket: Bucket,
+  path: string,
+  expiresIn = 3600
+): Promise<string | null> {
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .createSignedUrl(path, expiresIn);
+
+  if (error) {
+    console.error('createSignedUrl error:', error);
+    return null;
+  }
+  return data?.signedUrl ?? null;
+}
+
+/**
  * Upload reference video for a teacher
  */
 export async function uploadReferenceVideo(userId: string, file: File): Promise<string> {
@@ -89,28 +108,28 @@ export async function uploadThumbnail(userId: string, videoId: string, file: Fil
 }
 
 /**
- * Get reference video URL for a teacher
+ * Get reference video URL for a teacher (signed, works with private buckets)
  * Returns the most recent reference video URL
  */
 export async function getReferenceVideoUrl(userId: string): Promise<string | null> {
   try {
-    // List files in reference-videos bucket for this user
     const { data, error } = await supabase.storage
       .from('reference-videos')
-      .list(userId, {
-        limit: 1,
-        sortBy: { column: 'created_at', order: 'desc' },
-      });
+      .list(userId, { limit: 50 });
 
     if (error || !data || data.length === 0) {
+      console.warn('[Storage] No reference videos found for user:', userId);
       return null;
     }
 
-    // Get the most recent file
-    const latestFile = data[0];
-    const publicUrl = getPublicUrl('reference-videos', `${userId}/${latestFile.name}`);
-    
-    return publicUrl;
+    // Sort by created_at descending and pick the latest
+    const sorted = [...data].sort(
+      (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+    );
+    const path = `${userId}/${sorted[0].name}`;
+    const signed = await createSignedUrl('reference-videos', path);
+    console.log('[Storage] Reference video signed URL:', signed ? 'OK' : 'FAILED');
+    return signed;
   } catch (error) {
     console.error('Error getting reference video URL:', error);
     return null;

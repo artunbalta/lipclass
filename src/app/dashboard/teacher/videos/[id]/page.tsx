@@ -25,6 +25,9 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useVideoStore } from '@/stores/video-store';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { SlidePlayer } from '@/components/dashboard';
+import { getReferenceVideoUrl } from '@/lib/api/storage';
+import { useAuthStore } from '@/stores/auth-store';
 import { formatDuration, formatDate } from '@/lib/mock-data';
 import { showToast } from '@/lib/utils/toast';
 import { cn } from '@/lib/utils';
@@ -41,13 +44,27 @@ export default function VideoDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { selectedVideo, isLoading, fetchVideoById, deleteVideo } = useVideoStore();
+  const { user } = useAuthStore();
   const [copied, setCopied] = useState(false);
+  const [refVideoUrl, setRefVideoUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (params.id) {
       fetchVideoById(params.id as string);
     }
   }, [params.id, fetchVideoById]);
+
+  // Fetch reference video URL for the teacher
+  useEffect(() => {
+    if (user?.id) {
+      getReferenceVideoUrl(user.id).then((url) => {
+        console.log('[VideoDetail] Reference video URL:', url);
+        setRefVideoUrl(url);
+      }).catch((err) => {
+        console.error('[VideoDetail] Failed to get reference video:', err);
+      });
+    }
+  }, [user?.id]);
 
   const [deleteDialog, setDeleteDialog] = useState(false);
 
@@ -129,31 +146,32 @@ export default function VideoDetailPage() {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Video Player */}
+        {/* Slide Player / Video Player */}
         <div className="lg:col-span-2 space-y-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="relative aspect-video rounded-xl overflow-hidden bg-slate-900"
           >
-            {/* Mock Video Player */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                className="w-20 h-20 rounded-full bg-primary/90 flex items-center justify-center shadow-lg shadow-primary/30"
-              >
-                <Play className="w-8 h-8 text-primary-foreground ml-1" fill="currentColor" />
-              </motion.button>
-            </div>
-            {/* Progress Bar */}
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
-              <div className="h-full w-0 bg-primary" />
-            </div>
-            {/* Duration */}
-            <div className="absolute bottom-4 right-4 px-2 py-1 rounded bg-black/70 text-white text-sm font-medium">
-              {formatDuration(selectedVideo.duration)}
-            </div>
+            {selectedVideo.slidesData && selectedVideo.slidesData.slides.length > 0 ? (
+              <SlidePlayer
+                slidesData={selectedVideo.slidesData}
+                referenceVideoUrl={refVideoUrl}
+                title={selectedVideo.title}
+              />
+            ) : (
+              <div className="relative aspect-video rounded-xl overflow-hidden bg-slate-900 flex items-center justify-center">
+                <div className="text-center text-white/60">
+                  <Play className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">
+                    {selectedVideo.status === 'processing' 
+                      ? 'Ders içeriği hazırlanıyor...'
+                      : selectedVideo.status === 'failed'
+                      ? 'Oluşturma başarısız oldu'
+                      : 'İçerik henüz mevcut değil'}
+                  </p>
+                </div>
+              </div>
+            )}
           </motion.div>
 
           {/* Video Info */}

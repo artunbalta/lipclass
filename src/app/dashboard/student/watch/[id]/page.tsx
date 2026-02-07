@@ -27,8 +27,9 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { VideoCard } from '@/components/dashboard';
+import { VideoCard, SlidePlayer } from '@/components/dashboard';
 import { useVideoStore } from '@/stores/video-store';
+import { getReferenceVideoUrl } from '@/lib/api/storage';
 import { formatDuration, formatDate } from '@/lib/mock-data';
 import { cn } from '@/lib/utils';
 
@@ -36,11 +37,9 @@ export default function WatchVideoPage() {
   const params = useParams();
   const router = useRouter();
   const { selectedVideo, videos, isLoading, fetchVideoById, fetchVideos } = useVideoStore();
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [refVideoUrl, setRefVideoUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (params.id) {
@@ -49,22 +48,12 @@ export default function WatchVideoPage() {
     }
   }, [params.id, fetchVideoById, fetchVideos]);
 
-  // Simulate video progress
+  // Fetch reference video URL for the teacher
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isPlaying) {
-      interval = setInterval(() => {
-        setProgress((prev) => {
-          if (prev >= 100) {
-            setIsPlaying(false);
-            return 100;
-          }
-          return prev + 0.5;
-        });
-      }, 500);
+    if (selectedVideo?.teacherId) {
+      getReferenceVideoUrl(selectedVideo.teacherId).then(setRefVideoUrl).catch(() => {});
     }
-    return () => clearInterval(interval);
-  }, [isPlaying]);
+  }, [selectedVideo?.teacherId]);
 
   const relatedVideos = videos
     .filter((v) => v.id !== params.id && v.status === 'published')
@@ -105,97 +94,25 @@ export default function WatchVideoPage() {
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Video Player */}
+          {/* Slide Player / Video Player */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="relative aspect-video rounded-xl overflow-hidden bg-slate-900 group"
           >
-            {/* Video Content Area */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              {!isPlaying && (
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setIsPlaying(true)}
-                  className="w-20 h-20 rounded-full bg-primary/90 flex items-center justify-center shadow-lg shadow-primary/30"
-                >
-                  <Play className="w-8 h-8 text-primary-foreground ml-1" fill="currentColor" />
-                </motion.button>
-              )}
-            </div>
-
-            {/* Controls Overlay */}
-            <div className={cn(
-              'absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent transition-opacity',
-              isPlaying ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'
-            )}>
-              {/* Progress Bar */}
-              <div className="mb-3">
-                <div className="h-1 bg-white/30 rounded-full overflow-hidden cursor-pointer">
-                  <div 
-                    className="h-full bg-primary transition-all"
-                    style={{ width: `${progress}%` }}
-                  />
+            {selectedVideo.slidesData && selectedVideo.slidesData.slides.length > 0 ? (
+              <SlidePlayer
+                slidesData={selectedVideo.slidesData}
+                referenceVideoUrl={refVideoUrl}
+                title={selectedVideo.title}
+              />
+            ) : (
+              <div className="relative aspect-video rounded-xl overflow-hidden bg-slate-900 flex items-center justify-center">
+                <div className="text-center text-white/60">
+                  <Play className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">İçerik henüz mevcut değil</p>
                 </div>
               </div>
-
-              {/* Controls */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-white hover:bg-white/20"
-                    onClick={() => setIsPlaying(!isPlaying)}
-                  >
-                    {isPlaying ? (
-                      <Pause className="w-5 h-5" />
-                    ) : (
-                      <Play className="w-5 h-5" />
-                    )}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-white hover:bg-white/20"
-                  >
-                    <SkipBack className="w-5 h-5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-white hover:bg-white/20"
-                  >
-                    <SkipForward className="w-5 h-5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-white hover:bg-white/20"
-                    onClick={() => setIsMuted(!isMuted)}
-                  >
-                    {isMuted ? (
-                      <VolumeX className="w-5 h-5" />
-                    ) : (
-                      <Volume2 className="w-5 h-5" />
-                    )}
-                  </Button>
-                  <span className="text-white text-sm ml-2">
-                    {Math.floor(progress * selectedVideo.duration / 100 / 60)}:
-                    {String(Math.floor((progress * selectedVideo.duration / 100) % 60)).padStart(2, '0')} / 
-                    {formatDuration(selectedVideo.duration)}
-                  </span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-white hover:bg-white/20"
-                >
-                  <Maximize className="w-5 h-5" />
-                </Button>
-              </div>
-            </div>
+            )}
           </motion.div>
 
           {/* Video Info */}

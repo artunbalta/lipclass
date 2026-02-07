@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client';
-import { Video, CreateVideoFormData, VideoStats } from '@/types';
+import { Video, CreateVideoFormData, VideoStats, SlidesData } from '@/types';
 
 const supabase = createClient();
 
@@ -107,16 +107,19 @@ export async function createVideo(teacherId: string, videoData: CreateVideoFormD
 }
 
 export async function updateVideo(id: string, updates: Partial<Video>) {
+  const updatePayload: Record<string, unknown> = {};
+  
+  if (updates.title !== undefined) updatePayload.title = updates.title;
+  if (updates.description !== undefined) updatePayload.description = updates.description;
+  if (updates.status !== undefined) updatePayload.status = updates.status;
+  if (updates.thumbnailUrl !== undefined) updatePayload.thumbnail_url = updates.thumbnailUrl;
+  if (updates.videoUrl !== undefined) updatePayload.video_url = updates.videoUrl;
+  if (updates.duration !== undefined) updatePayload.duration = updates.duration;
+  if (updates.slidesData !== undefined) updatePayload.slides_data = updates.slidesData;
+
   const { data, error } = await supabase
     .from('videos')
-    .update({
-      title: updates.title,
-      description: updates.description,
-      status: updates.status,
-      thumbnail_url: updates.thumbnailUrl,
-      video_url: updates.videoUrl,
-      duration: updates.duration,
-    })
+    .update(updatePayload)
     .eq('id', id)
     .select()
     .single();
@@ -206,6 +209,12 @@ export async function incrementVideoView(videoId: string, userId?: string, watch
 function mapDbVideoToVideo(dbVideo: any): Video {
   const profile = Array.isArray(dbVideo.profiles) ? dbVideo.profiles[0] : (dbVideo.profiles || {});
 
+  // Parse slides_data from JSONB
+  let slidesData: SlidesData | undefined;
+  if (dbVideo.slides_data && typeof dbVideo.slides_data === 'object' && Array.isArray(dbVideo.slides_data.slides)) {
+    slidesData = dbVideo.slides_data as SlidesData;
+  }
+
   return {
     id: dbVideo.id,
     teacherId: dbVideo.teacher_id,
@@ -217,7 +226,8 @@ function mapDbVideoToVideo(dbVideo: any): Video {
     grade: dbVideo.grade,
     topic: dbVideo.topic,
     thumbnailUrl: dbVideo.thumbnail_url || 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=400&h=225&fit=crop',
-    videoUrl: dbVideo.video_url || '#',
+    videoUrl: dbVideo.video_url || undefined,
+    slidesData,
     duration: dbVideo.duration || 0,
     status: dbVideo.status,
     viewCount: dbVideo.view_count || 0,
