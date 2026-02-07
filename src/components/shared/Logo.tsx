@@ -13,16 +13,16 @@ interface LogoProps {
 export function Logo({ className, size = 'md', variant = 'dark' }: LogoProps) {
   const sizes = {
     sm: {
-      logoWidth: 100,
-      logoHeight: 40,
+      logoWidth: 120,
+      logoHeight: 48,
     },
     md: {
-      logoWidth: 130,
-      logoHeight: 52,
+      logoWidth: 160,
+      logoHeight: 64,
     },
     lg: {
-      logoWidth: 170,
-      logoHeight: 68,
+      logoWidth: 220,
+      logoHeight: 88,
     },
   };
 

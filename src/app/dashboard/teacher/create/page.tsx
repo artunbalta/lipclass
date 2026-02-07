@@ -3,10 +3,10 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ArrowLeft, 
-  Wand2, 
-  Loader2, 
+import {
+  ArrowLeft,
+  Wand2,
+  Loader2,
   Check,
   BookOpen,
   FileText,
@@ -34,7 +34,7 @@ const createVideoSchema = z.object({
   grade: z.string().min(1, 'Sınıf seçin'),
   topic: z.string().min(3, 'Konu en az 3 karakter olmalı'),
   description: z.string().min(10, 'Açıklama en az 10 karakter olmalı'),
-  prompt: z.string().optional().default(''),
+  prompt: z.string().min(0),
   tone: z.enum(['formal', 'friendly', 'energetic']),
   includesProblemSolving: z.boolean(),
   problemCount: z.number().min(1).max(10),
@@ -145,9 +145,9 @@ export default function CreateVideoPage() {
       setIsSuccess(true);
     } catch (error) {
       setIsCreating(false);
-      setGenerationProgress({ 
-        stage: 'failed', 
-        error: error instanceof Error ? error.message : 'Bilinmeyen hata' 
+      setGenerationProgress({
+        stage: 'failed',
+        error: error instanceof Error ? error.message : 'Bilinmeyen hata'
       });
       showToast.error('Hata oluştu', 'Ders oluşturulurken bir sorun yaşandı. Lütfen tekrar deneyin.');
     }
@@ -231,7 +231,7 @@ export default function CreateVideoPage() {
               <p className="text-muted-foreground mb-6">
                 Ders sunumunuz hazırlanıyor. Bu işlem birkaç dakika sürebilir.
               </p>
-              
+
               {/* Progress Bar */}
               <div className="w-full bg-muted rounded-full h-2 mb-2">
                 <motion.div
@@ -275,8 +275,8 @@ export default function CreateVideoPage() {
                 currentStep === step.id
                   ? 'bg-primary text-primary-foreground'
                   : currentStep > step.id
-                  ? 'bg-primary/20 text-primary'
-                  : 'bg-muted text-muted-foreground'
+                    ? 'bg-primary/20 text-primary'
+                    : 'bg-muted text-muted-foreground'
               )}
             >
               <step.icon className="w-4 h-4" />
@@ -308,7 +308,7 @@ export default function CreateVideoPage() {
                   <BookOpen className="w-5 h-5 text-primary" />
                   Ders Bilgileri
                 </h3>
-                
+
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="subject">Ders *</Label>

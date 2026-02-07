@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
@@ -10,12 +11,16 @@ import {
   Mail,
   Phone,
   MapPin,
-  ArrowRight
+  ArrowRight,
+  Loader2,
+  CheckCircle2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Logo } from '@/components/shared/Logo';
 import { Separator } from '@/components/ui/separator';
+import { subscribeToNewsletter } from '@/lib/api/newsletter';
+import { showToast } from '@/lib/utils/toast';
 
 const footerLinks = {
   product: {
@@ -50,6 +55,31 @@ const socialLinks = [
 ];
 */
 export function Footer() {
+  const [email, setEmail] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSubscribed, setIsSubscribed] = useState(false);
+
+  const handleSubscribe = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+
+    setIsLoading(true);
+    const result = await subscribeToNewsletter(email);
+    setIsLoading(false);
+
+    if (result.success) {
+      setIsSubscribed(true);
+      setEmail('');
+      showToast.success('Başarılı!', 'Bültene abone oldunuz.');
+      // Reset success state after 5 seconds
+      setTimeout(() => setIsSubscribed(false), 5000);
+    } else if (result.alreadySubscribed) {
+      showToast.info('Bilgi', 'Bu e-posta adresi zaten kayıtlı.');
+    } else {
+      showToast.error('Hata', result.error || 'Bir hata oluştu.');
+    }
+  };
+
   return (
     <footer className="bg-white border-t border-slate-100">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -64,16 +94,35 @@ export function Footer() {
                 En son güncellemeler, yeni özellikler ve eğitim teknolojileri hakkında bilgi almak için bültenimize abone olun.
               </p>
             </div>
-            <div className="flex w-full lg:w-auto gap-3">
-              <Input
-                type="email"
-                placeholder="E-posta adresiniz"
-                className="bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 min-w-[280px] h-12 rounded-xl"
-              />
-              <Button className="h-12 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow-lg shadow-indigo-200">
-                Abone Ol
-              </Button>
-            </div>
+            {isSubscribed ? (
+              <div className="flex items-center gap-2 text-green-600">
+                <CheckCircle2 className="w-5 h-5" />
+                <span className="font-medium">Abone oldunuz!</span>
+              </div>
+            ) : (
+              <form onSubmit={handleSubscribe} className="flex w-full lg:w-auto gap-3">
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="E-posta adresiniz"
+                  required
+                  disabled={isLoading}
+                  className="bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 min-w-[280px] h-12 rounded-xl"
+                />
+                <Button
+                  type="submit"
+                  disabled={isLoading}
+                  className="h-12 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow-lg shadow-indigo-200"
+                >
+                  {isLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    'Abone Ol'
+                  )}
+                </Button>
+              </form>
+            )}
           </div>
         </div>
 
@@ -84,8 +133,8 @@ export function Footer() {
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 lg:gap-12">
             {/* Brand Column */}
             <div className="col-span-2 lg:col-span-2">
-              <Logo size="lg" />
-              <p className="mt-6 text-slate-500 text-sm max-w-sm leading-relaxed">
+              <Logo size="md" />
+              <p className="mt-2 text-slate-500 text-sm max-w-sm leading-relaxed">
                 Chalk, yapay zeka teknolojisi ile öğretmenleri dijital dünyada güçlendiren, okulları geleceğe taşıyan yeni nesil eğitim platformudur.
               </p>
 

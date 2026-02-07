@@ -22,6 +22,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { submitContactMessage } from '@/lib/api/contact';
+import { showToast } from '@/lib/utils/toast';
 
 const contactInfo = [
     {
@@ -70,15 +72,19 @@ export default function ContactPage() {
         e.preventDefault();
         setIsSubmitting(true);
 
-        // Simulate form submission
-        await new Promise((resolve) => setTimeout(resolve, 1500));
+        const result = await submitContactMessage(formData);
 
         setIsSubmitting(false);
-        setIsSubmitted(true);
-        setFormData({ name: '', email: '', subject: '', message: '' });
 
-        // Reset success message after 5 seconds
-        setTimeout(() => setIsSubmitted(false), 5000);
+        if (result.success) {
+            setIsSubmitted(true);
+            setFormData({ name: '', email: '', subject: '', message: '' });
+            showToast.success('Mesajınız Gönderildi!', 'En kısa sürede size dönüş yapacağız.');
+            // Reset success message after 5 seconds
+            setTimeout(() => setIsSubmitted(false), 5000);
+        } else {
+            showToast.error('Hata', result.error || 'Mesajınız gönderilemedi.');
+        }
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {

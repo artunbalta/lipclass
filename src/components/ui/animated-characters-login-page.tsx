@@ -391,12 +391,11 @@ function LoginPage({
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
       {/* Left Content Section */}
-      <div className="relative hidden lg:flex flex-col justify-between bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-12 text-primary-foreground">
-        <div className="relative z-20">
-          <Logo size="md" variant="light" />
-        </div>
+      <div className="relative hidden lg:flex flex-col justify-between bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-primary-foreground">
+        {/* Empty top space for balance */}
+        <div className="relative z-20" />
 
-        <div className="relative z-20 flex items-end justify-center h-[500px]">
+        <div className="relative z-20 flex items-end justify-center h-[450px]">
           {/* Cartoon Characters */}
           <div className="relative" style={{ width: '550px', height: '400px' }}>
             {/* Primary (Indigo) tall rectangle character - Back layer */}
@@ -573,13 +572,13 @@ function LoginPage({
         </div>
 
         <div className="relative z-20 flex items-center gap-8 text-sm text-primary-foreground/60">
-          <a href="#" className="hover:text-primary-foreground transition-colors">
+          <a href="/privacy" className="hover:text-primary-foreground transition-colors">
             Gizlilik Politikası
           </a>
-          <a href="#" className="hover:text-primary-foreground transition-colors">
+          <a href="/terms" className="hover:text-primary-foreground transition-colors">
             Kullanım Koşulları
           </a>
-          <a href="#" className="hover:text-primary-foreground transition-colors">
+          <a href="/contact" className="hover:text-primary-foreground transition-colors">
             İletişim
           </a>
         </div>
@@ -593,13 +592,12 @@ function LoginPage({
       {/* Right Login Section */}
       <div className="flex items-center justify-center p-8 bg-background">
         <div className="w-full max-w-[420px]">
-          {/* Mobile Logo */}
-          <div className="lg:hidden flex items-center justify-center mb-12">
-            <Logo size="lg" />
-          </div>
 
           {/* Header */}
-          <div className="text-center mb-10">
+          <div className="text-center mb-8">
+            <div className="flex justify-center mb-3">
+              <Logo size="md" />
+            </div>
             <h1 className="text-3xl font-bold tracking-tight mb-2">Tekrar Hoş Geldiniz!</h1>
             <p className="text-muted-foreground text-sm">Lütfen bilgilerinizi girin</p>
           </div>
