@@ -25,6 +25,8 @@ export interface GenerationOptions {
   problemCount?: number;
   difficulty?: string;
   referenceVideoUrl?: string; // Teacher's reference video for lipsync
+  sourceOnly?: boolean;       // RAG-only mode: only use teacher's documents
+  sourceDocumentIds?: string[]; // Selected document IDs for RAG
   onProgress?: (progress: GenerationProgress) => void;
 }
 
@@ -38,6 +40,7 @@ export interface GenerationOptions {
 export async function generateVideo(options: GenerationOptions): Promise<SlidesData> {
   const {
     videoId,
+    teacherId,
     topic,
     description,
     prompt,
@@ -47,12 +50,44 @@ export async function generateVideo(options: GenerationOptions): Promise<SlidesD
     problemCount,
     difficulty,
     referenceVideoUrl,
+    sourceOnly,
+    sourceDocumentIds,
     onProgress,
   } = options;
 
   try {
     // Update video status to processing
     await updateVideo(videoId, { status: 'processing' } as any);
+
+    // ━━━ Stage 0: RAG Context Retrieval (optional) ━━━
+    let ragContext: string | undefined;
+
+    if (sourceDocumentIds && sourceDocumentIds.length > 0) {
+      onProgress?.({ stage: 'generating_slides', progress: 1 });
+
+      try {
+        const ragResponse = await fetch('/api/generate-video', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            step: 'rag_retrieve',
+            query: `${topic} ${description}`,
+            teacherId,
+            documentIds: sourceDocumentIds,
+          }),
+        });
+
+        if (ragResponse.ok) {
+          const ragData = await ragResponse.json();
+          ragContext = ragData.context;
+          console.log(`[Generation] RAG context retrieved (${ragContext?.length || 0} chars)`);
+        } else {
+          console.warn('[Generation] RAG retrieval failed, continuing without context');
+        }
+      } catch (ragError) {
+        console.warn('[Generation] RAG retrieval error:', ragError);
+      }
+    }
 
     // ━━━ Stage 1: Generate slides with LLM (0-10%) ━━━
     onProgress?.({ stage: 'generating_slides', progress: 2 });
@@ -70,6 +105,8 @@ export async function generateVideo(options: GenerationOptions): Promise<SlidesD
         includesProblemSolving,
         problemCount,
         difficulty,
+        ragContext,
+        sourceOnly,
       }),
     });
 

@@ -28,7 +28,7 @@ export function Logo({ className, size = 'md', variant = 'dark' }: LogoProps) {
 
   // Dark variant = black chalk (for white backgrounds)
   // Light variant = white chalk (for dark backgrounds)
-  const logoSrc = variant === 'light' ? '/chalk-logo-light.png' : '/chalk-logo-dark.png';
+  const logoSrc = variant === 'light' ? '/chalk-logo.png' : '/chalk-logo-dark.png';
 
   return (
     <Link href="/" className={cn('flex items-center group', className)}>

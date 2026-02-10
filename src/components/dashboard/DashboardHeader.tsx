@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  Search, 
-  Bell, 
+import {
+  Search,
+  Bell,
   Menu,
   X,
   Moon,
@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAuthStore } from '@/stores/auth-store';
 import { cn } from '@/lib/utils';
-import { useEffect, useState as useReactState } from 'react';
+import { useTheme } from 'next-themes';
 
 interface DashboardHeaderProps {
   onMenuClick?: () => void;
@@ -33,23 +33,11 @@ interface DashboardHeaderProps {
 
 export function DashboardHeader({ onMenuClick, showMenuButton = false }: DashboardHeaderProps) {
   const { user, logout } = useAuthStore();
-  const [darkMode, setDarkMode] = useReactState(false);
+  const { theme, setTheme } = useTheme();
   const [searchOpen, setSearchOpen] = useState(false);
 
-  useEffect(() => {
-    const isDark = document.documentElement.classList.contains('dark');
-    setDarkMode(isDark);
-  }, []);
-
   const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
-    if (darkMode) {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-    } else {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    }
+    setTheme(theme === 'dark' ? 'light' : 'dark');
   };
 
   const handleLogout = () => {
@@ -66,7 +54,7 @@ export function DashboardHeader({ onMenuClick, showMenuButton = false }: Dashboa
             <Menu className="w-5 h-5" />
           </Button>
         )}
-        
+
         {/* Search */}
         <div className="hidden sm:flex items-center">
           <div className="relative">
@@ -77,7 +65,7 @@ export function DashboardHeader({ onMenuClick, showMenuButton = false }: Dashboa
             />
           </div>
         </div>
-        
+
         {/* Mobile Search Toggle */}
         <Button
           variant="ghost"
@@ -93,7 +81,7 @@ export function DashboardHeader({ onMenuClick, showMenuButton = false }: Dashboa
       <div className="flex items-center gap-2">
         {/* Dark Mode Toggle */}
         <Button variant="ghost" size="icon" onClick={toggleDarkMode}>
-          {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
         </Button>
 
         {/* Notifications */}
@@ -157,7 +145,7 @@ export function DashboardHeader({ onMenuClick, showMenuButton = false }: Dashboa
             <DropdownMenuItem>Ayarlar</DropdownMenuItem>
             <DropdownMenuItem>Yardım</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem 
+            <DropdownMenuItem
               onClick={handleLogout}
               className="text-destructive focus:text-destructive"
             >

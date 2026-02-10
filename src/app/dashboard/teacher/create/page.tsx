@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -11,6 +11,7 @@ import {
   BookOpen,
   FileText,
   Settings2,
+  Library,
 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -41,6 +42,8 @@ const createVideoSchema = z.object({
   difficulty: z.enum(['easy', 'medium', 'hard']),
   estimatedDuration: z.number().min(5).max(60),
   language: z.enum(['tr', 'en']),
+  sourceOnly: z.boolean(),
+  sourceDocumentIds: z.array(z.string()),
 });
 
 type CreateVideoForm = z.infer<typeof createVideoSchema>;
@@ -59,6 +62,34 @@ export default function CreateVideoPage() {
   const router = useRouter();
   const { createVideo } = useVideoStore();
   const { user } = useAuthStore();
+
+  // Teacher documents for RAG
+  interface TeacherDoc {
+    id: string;
+    original_name: string;
+    status: string;
+    chunk_count: number;
+  }
+  const [teacherDocs, setTeacherDocs] = useState<TeacherDoc[]>([]);
+
+  const fetchTeacherDocs = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const res = await fetch(`/api/documents?teacherId=${user.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setTeacherDocs(
+          (data.documents || []).filter((d: TeacherDoc) => d.status === 'embedded')
+        );
+      }
+    } catch (err) {
+      console.error('Failed to fetch teacher docs:', err);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    fetchTeacherDocs();
+  }, [fetchTeacherDocs]);
 
   const {
     register,
@@ -80,6 +111,8 @@ export default function CreateVideoPage() {
       difficulty: 'medium',
       estimatedDuration: 15,
       language: 'tr',
+      sourceOnly: false,
+      sourceDocumentIds: [],
     },
   });
 
@@ -123,6 +156,8 @@ export default function CreateVideoPage() {
         problemCount: data.problemCount,
         difficulty: data.difficulty,
         referenceVideoUrl: refVideoUrl || undefined,
+        sourceOnly: data.sourceOnly,
+        sourceDocumentIds: data.sourceDocumentIds.length > 0 ? data.sourceDocumentIds : undefined,
         onProgress: (progress) => {
           setGenerationProgress(progress);
         },
@@ -429,6 +464,95 @@ export default function CreateVideoPage() {
                       ))}
                     </div>
                   </div>
+                </div>
+              </div>
+
+              {/* Source Documents (RAG) */}
+              <div className="p-6 rounded-xl border border-border bg-card">
+                <h3 className="font-semibold mb-4 flex items-center gap-2">
+                  <Library className="w-5 h-5 text-primary" />
+                  Kaynak Dökümanlar
+                </h3>
+
+                <div className="space-y-4">
+                  {/* Source Only Toggle */}
+                  <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
+                    <div>
+                      <Label className="font-medium">📚 Kendi kaynaklarımın dışına çıkma</Label>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Aktifken ders içeriği sadece yüklediğiniz kaynaklara dayanır.
+                        Kapalıyken kaynaklar referans alınır ama ek bilgi de eklenebilir.
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      className="w-5 h-5 rounded border-input text-primary focus:ring-primary"
+                      {...register('sourceOnly')}
+                    />
+                  </div>
+
+                  {/* Document Picker */}
+                  {teacherDocs.length > 0 ? (
+                    <div className="space-y-2">
+                      <Label>Kullanılacak Dökümanlar</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Derste kullanılmasını istediğiniz kaynakları seçin.
+                        {watchAll.sourceOnly && ' (Seçim zorunludur)'}
+                      </p>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {teacherDocs.map((doc) => (
+                          <label
+                            key={doc.id}
+                            className={cn(
+                              'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
+                              watchAll.sourceDocumentIds?.includes(doc.id)
+                                ? 'border-primary bg-primary/5'
+                                : 'border-border hover:bg-muted/30'
+                            )}
+                          >
+                            <input
+                              type="checkbox"
+                              className="w-4 h-4 rounded border-input text-primary"
+                              checked={watchAll.sourceDocumentIds?.includes(doc.id) || false}
+                              onChange={(e) => {
+                                const current = watchAll.sourceDocumentIds || [];
+                                if (e.target.checked) {
+                                  setValue('sourceDocumentIds', [...current, doc.id]);
+                                } else {
+                                  setValue(
+                                    'sourceDocumentIds',
+                                    current.filter((id: string) => id !== doc.id)
+                                  );
+                                }
+                              }}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{doc.original_name}</p>
+                              <p className="text-xs text-muted-foreground">{doc.chunk_count} parça</p>
+                            </div>
+                            <Badge variant="secondary" className="text-[10px]">
+                              Hazır
+                            </Badge>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 text-muted-foreground">
+                      <Library className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                      <p className="text-sm">Henüz kaynak döküman yüklenmemiş.</p>
+                      <p className="text-xs mt-1">
+                        Kaynak yüklemek için{' '}
+                        <a
+                          href="/dashboard/teacher/documents"
+                          className="text-primary hover:underline"
+                        >
+                          Dökümanlar
+                        </a>{' '}
+                        sayfasını ziyaret edin.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 
