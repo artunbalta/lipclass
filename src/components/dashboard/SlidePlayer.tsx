@@ -50,6 +50,13 @@ export default function SlidePlayer({
   const [mediaProgress, setMediaProgress] = useState(0);
   const [mediaDuration, setMediaDuration] = useState(0);
 
+  // Draggable video overlay position (snap to corners)
+  const [videoCorner, setVideoCorner] = useState<'bottom-left' | 'bottom-right' | 'top-left' | 'top-right'>('bottom-left');
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
+  const videoOverlayRef = useRef<HTMLDivElement>(null);
+
   const audioRef = useRef<HTMLAudioElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -236,6 +243,79 @@ export default function SlidePlayer({
     [mediaDuration, getPrimaryMedia]
   );
 
+  // ── Draggable video overlay (FaceTime style snap-to-corner) ──
+  const handleDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const overlay = videoOverlayRef.current;
+    if (!overlay) return;
+
+    const rect = overlay.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+
+    setDragOffset({ x: clientX - rect.left, y: clientY - rect.top });
+    setDragPos({ x: rect.left, y: rect.top });
+    setIsDragging(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMove = (e: MouseEvent | TouchEvent) => {
+      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+      setDragPos({ x: clientX - dragOffset.x, y: clientY - dragOffset.y });
+    };
+
+    const handleEnd = (e: MouseEvent | TouchEvent) => {
+      setIsDragging(false);
+
+      // Snap to nearest corner
+      const container = containerRef.current;
+      if (!container) { setDragPos(null); return; }
+
+      const containerRect = container.getBoundingClientRect();
+      const clientX = 'changedTouches' in e ? e.changedTouches[0].clientX : e.clientX;
+      const clientY = 'changedTouches' in e ? e.changedTouches[0].clientY : e.clientY;
+
+      const relX = clientX - containerRect.left;
+      const relY = clientY - containerRect.top;
+      const midX = containerRect.width / 2;
+      const midY = containerRect.height / 2;
+
+      const isLeft = relX < midX;
+      const isTop = relY < midY;
+
+      if (isTop && isLeft) setVideoCorner('top-left');
+      else if (isTop && !isLeft) setVideoCorner('top-right');
+      else if (!isTop && isLeft) setVideoCorner('bottom-left');
+      else setVideoCorner('bottom-right');
+
+      setDragPos(null);
+    };
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleEnd);
+    window.addEventListener('touchmove', handleMove, { passive: false });
+    window.addEventListener('touchend', handleEnd);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleEnd);
+      window.removeEventListener('touchmove', handleMove);
+      window.removeEventListener('touchend', handleEnd);
+    };
+  }, [isDragging, dragOffset]);
+
+  // CSS position classes for snap corners
+  const cornerClasses: Record<string, string> = {
+    'bottom-left': 'bottom-16 left-4',
+    'bottom-right': 'bottom-16 right-4',
+    'top-left': 'top-4 left-4',
+    'top-right': 'top-4 right-4',
+  };
+
   // ── Keyboard shortcuts ──
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -304,12 +384,29 @@ export default function SlidePlayer({
           <SlideRenderer slide={currentSlide} className="h-full" />
         </div>
 
-        {/* Teacher video overlay (bottom-left) */}
+        {/* Teacher video overlay (draggable, snap-to-corner) */}
         {videoSrc && (
-          <div className="absolute bottom-16 left-4 w-44 h-28 sm:w-56 sm:h-36 rounded-lg overflow-hidden shadow-2xl border-2 border-white/20 z-10 bg-black">
+          <div
+            ref={videoOverlayRef}
+            onMouseDown={handleDragStart}
+            onTouchStart={handleDragStart}
+            className={`w-44 h-28 sm:w-56 sm:h-36 rounded-lg overflow-hidden shadow-2xl border-2 border-white/20 z-10 bg-black select-none ${
+              isDragging ? 'cursor-grabbing opacity-90 scale-105' : 'cursor-grab'
+            } ${dragPos ? 'fixed' : `absolute ${cornerClasses[videoCorner]}`}`}
+            style={
+              dragPos
+                ? {
+                    left: dragPos.x,
+                    top: dragPos.y,
+                    transition: 'none',
+                    zIndex: 50,
+                  }
+                : { transition: 'all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)' }
+            }
+          >
             <video
               ref={videoRef}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover pointer-events-none"
               playsInline
               preload="auto"
             />
