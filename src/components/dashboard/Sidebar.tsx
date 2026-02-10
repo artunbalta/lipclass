@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useTheme } from 'next-themes';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Home,
@@ -49,6 +50,15 @@ export function Sidebar({ role }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
   const { user, logout } = useAuthStore();
+  const { theme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Default to light theme (dark logo) until mounted to prevent hydration mismatch
+  const currentTheme = mounted ? resolvedTheme : 'light';
 
   const navItems = role === 'teacher' ? teacherNavItems : studentNavItems;
 
@@ -69,7 +79,10 @@ export function Sidebar({ role }: SidebarProps) {
         'flex items-center h-16 px-4 border-b border-border',
         collapsed ? 'justify-center' : 'justify-between'
       )}>
-        <Logo size={collapsed ? "sm" : "md"} />
+        <Logo
+          size={collapsed ? "sm" : "md"}
+          variant={currentTheme === 'dark' ? 'light' : 'dark'}
+        />
         <Button
           variant="ghost"
           size="icon"

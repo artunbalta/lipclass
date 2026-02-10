@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
+import { ThemeProvider } from "@/components/theme-provider";
 import LiquidEther from "@/components/ui/LiquidEther";
 import "katex/dist/katex.min.css";
 import "./globals.css";
@@ -53,11 +54,18 @@ export default function RootLayout({
         style={{ fontFamily: "var(--font-plus-jakarta-sans), system-ui, sans-serif" }}
         suppressHydrationWarning
       >
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: -1, pointerEvents: 'none' }}>
-          <LiquidEther />
-        </div>
-        {children}
-        <Toaster position="top-right" />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: -1, pointerEvents: 'none' }}>
+            <LiquidEther />
+          </div>
+          {children}
+          <Toaster position="top-right" />
+        </ThemeProvider>
       </body>
     </html>
   );

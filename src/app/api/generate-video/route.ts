@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { retrieveContext, isRagConfigured } from '@/lib/api/rag';
 
 // Fal AI API endpoints
 const FAL_API_BASE = 'https://fal.run';
@@ -61,7 +62,9 @@ async function generateSlides(
   tone: 'formal' | 'friendly' | 'energetic',
   includesProblemSolving: boolean,
   problemCount?: number,
-  difficulty?: string
+  difficulty?: string,
+  ragContext?: string,
+  sourceOnly?: boolean
 ): Promise<{ slides: Array<{ slideNumber: number; title: string; content: string; bulletPoints: string[]; narrationText: string }> }> {
   const modelPath = 'fal-ai/any-llm';
 
@@ -84,8 +87,130 @@ async function generateSlides(
     : 'Use a detailed, friendly and educational tone. Address students warmly.';
   const styleInstruction = hasStyleHints ? '' : (language === 'tr' ? `\nAnlatım stili: ${defaultStyle}` : `\nStyle: ${defaultStyle}`);
 
-  const systemPrompt = language === 'tr'
-    ? `Sen deneyimli bir öğretmensin. Verilen konu ve açıklamaya göre TAM OLARAK 10 slaytlık görsel açıdan zengin, formül ve şablon ağırlıklı profesyonel bir ders sunumu oluştur.
+  // ── Mermaid diagram instructions (added to all modes) ──
+  const BT = '`'; // backtick - can't use directly in template literals
+  const codeBlockOpen = BT + BT + BT + 'mermaid';
+  const codeBlockClose = BT + BT + BT;
+  const mermaidInstruction = language === 'tr'
+    ? '\n\nDİYAGRAM KURALLARI:\nUygun yerlerde konuyu görselleştiren Mermaid diyagramları üret. Diyagramları content alanına şu formatta ekle:\n' + codeBlockOpen + '\nflowchart TD\n    A[Başlangıç] --> B[Sonuç]\n' + codeBlockClose + '\nDesteklenen tipler: flowchart, sequenceDiagram, pie, graph. Her sunumda en az 1-2 slaytın diyagram içermesi tercih edilir. Diyagramlar konuyu anlamayı kolaylaştırmalı (süreç akışları, kavram ilişkileri, karar ağaçları vb.).'
+    : '\n\nDIAGRAM RULES:\nGenerate Mermaid diagrams where appropriate to visualize the topic. Add diagrams in the content field using this format:\n' + codeBlockOpen + '\nflowchart TD\n    A[Start] --> B[Result]\n' + codeBlockClose + '\nSupported types: flowchart, sequenceDiagram, pie, graph. At least 1-2 slides should contain diagrams. Diagrams should help understand the topic (process flows, concept relationships, decision trees, etc.).';
+
+  // ── Build RAG context section ──
+  const ragSection = ragContext
+    ? (language === 'tr'
+      ? `\n\nÖĞRETMENİN KAYNAKLARI:\n${ragContext}`
+      : `\n\nTEACHER'S SOURCE MATERIALS:\n${ragContext}`)
+    : '';
+
+  // ── Determine system prompt mode ──
+  let systemPrompt: string;
+
+  if (sourceOnly && ragContext) {
+    // ══ RAG-ONLY MODE: Only use provided sources ══
+    systemPrompt = language === 'tr'
+      ? `Sen deneyimli bir öğretmensin. SADECE aşağıda verilen kaynakların içeriğine dayanarak TAM OLARAK 10 slaytlık profesyonel bir ders sunumu oluştur.
+
+KRİTİK: Kaynakların dışına ÇIKMA. Kaynakta olmayan bilgi ekleme. Tüm içerik ve örnekler kaynaklardaki bilgilerden türetilmeli.
+
+KRİTİK KURALLAR:
+1. İçerik FORMÜL VE GÖRSEL AĞIRLIKLI olmalı. Uzun düz cümleler yerine formüller, denklemler, tablolar, adım adım çözümler kullan.
+2. Her slaytın content alanında MUTLAKA en az 2-3 KaTeX formül/denklem olmalı (kaynakta varsa).
+3. KaTeX formüllerinde backslash'leri ÇİFT yaz: \\\\frac, \\\\sqrt, \\\\int, \\\\sum, \\\\text, \\\\left, \\\\right, \\\\cdot, \\\\times, \\\\leq, \\\\geq, \\\\neq, \\\\alpha, \\\\beta, \\\\theta, \\\\pi, \\\\infty vb.
+4. Inline formül: $...$, Blok formül: $$...$$
+5. Sol alt köşeye yakın metin yazma.
+${mermaidInstruction}
+
+Her slayt şunları içermeli:
+- slideNumber: Slayt numarası (1-10)
+- title: Slayt başlığı
+- content: ANA İÇERİK. Kaynağa dayalı. Satır atlamaları için \\n kullan.
+- bulletPoints: 3-5 kısa madde.
+- narrationText: Öğretmenin söyleyeceği anlatım (60-100 kelime). Samimi, sohbet tarzında. ASLA LaTeX veya $ sembolü kullanma. Formülleri okunuşuyla yaz (örn: "F eşittir m çarpı a"). Selamlama/veda KULLANMA.
+${ragSection}
+${problemInstruction}
+${styleInstruction}
+Ton: ${toneLabel}
+
+SADECE geçerli JSON döndür. Format:
+{"slides": [{"slideNumber": 1, "title": "...", "content": "...", "bulletPoints": ["..."], "narrationText": "..."}]}`
+      : `You are an experienced teacher. Create EXACTLY 10 professional slides ONLY based on the provided source materials.
+
+CRITICAL: Do NOT go beyond the sources. Do NOT add information not present in the sources. All content must derive from the provided materials.
+
+CRITICAL RULES:
+1. Content must be FORMULA AND VISUAL HEAVY.
+2. Each slide's content must contain at least 2-3 KaTeX formulas (if present in sources).
+3. Use DOUBLE backslashes in KaTeX: \\\\frac, \\\\sqrt, etc.
+4. Inline formula: $...$, Block formula: $$...$$
+5. Do NOT place text near the bottom-left corner.
+${mermaidInstruction}
+
+Each slide must contain: slideNumber, title, content, bulletPoints, narrationText (60-100 words). Narration must be spoken text. NO LaTeX/Math symbols. Write "equals", "divided by" etc.
+${ragSection}
+${problemInstruction}
+${styleInstruction}
+Tone: ${toneLabel}
+
+Return ONLY valid JSON. Format:
+{"slides": [{"slideNumber": 1, "title": "...", "content": "...", "bulletPoints": ["..."], "narrationText": "..."}]}`;
+  } else if (ragContext) {
+    // ══ HYBRID MODE: Use sources as reference + general knowledge ══
+    systemPrompt = language === 'tr'
+      ? `Sen deneyimli bir öğretmensin. Verilen konu hakkında TAM OLARAK 10 slaytlık profesyonel bir ders sunumu oluştur. Aşağıda verilen kaynak dökümanları referans al ve içeriği zenginleştir. Gerektiğinde ek bilgi ve açıklama ekleyebilirsin.
+
+KRİTİK KURALLAR:
+1. İçerik FORMÜL VE GÖRSEL AĞIRLIKLI olmalı. Uzun düz cümleler yerine formüller, denklemler, tablolar, adım adım çözümler kullan.
+2. Her slaytın content alanında MUTLAKA en az 2-3 KaTeX formül/denklem olmalı.
+3. KaTeX formüllerinde backslash'leri ÇİFT yaz: \\\\frac, \\\\sqrt, \\\\int, \\\\sum, \\\\text, \\\\left, \\\\right, \\\\cdot, \\\\times, \\\\leq, \\\\geq, \\\\neq, \\\\alpha, \\\\beta, \\\\theta, \\\\pi, \\\\infty vb.
+4. Inline formül: $...$, Blok formül: $$...$$
+5. Sol alt köşeye yakın metin yazma.
+${mermaidInstruction}
+
+Her slayt şunları içermeli:
+- slideNumber: Slayt numarası (1-10)
+- title: Slayt başlığı
+- content: ANA İÇERİK. Formül ağırlıklı. Kısa açıklayıcı cümleler + çokça KaTeX formül/denklem. Satır atlamaları için \\n kullan.
+- bulletPoints: 3-5 kısa madde.
+- narrationText: Öğretmenin söyleyeceği anlatım (60-100 kelime). Samimi, sohbet tarzında. ASLA LaTeX veya $ sembolü kullanma. Formülleri okunuşuyla yaz (örn: "F eşittir m çarpı a"). Selamlama/veda KULLANMA.
+
+Sunum yapısı:
+- Slayt 1: Konuya giriş
+- Slayt 2-3: Temel kavramlar
+- Slayt 4-5: Kurallar ve formüller
+- Slayt 6-7: Örnekler
+- Slayt 8-9: İleri örnekler
+- Slayt 10: Özet
+${ragSection}
+${problemInstruction}
+${styleInstruction}
+Ton: ${toneLabel}
+
+SADECE geçerli JSON döndür. Format:
+{"slides": [{"slideNumber": 1, "title": "...", "content": "...", "bulletPoints": ["..."], "narrationText": "..."}]}`
+      : `You are an experienced teacher. Create EXACTLY 10 professional slides on the given topic. Use the provided source documents as reference and enrich the content. You may add additional explanations beyond the sources.
+
+CRITICAL RULES:
+1. Content must be FORMULA AND VISUAL HEAVY.
+2. Each slide must contain at least 2-3 KaTeX formulas.
+3. Use DOUBLE backslashes in KaTeX: \\\\frac, \\\\sqrt, etc.
+4. Inline formula: $...$, Block formula: $$...$$
+5. Do NOT place text near the bottom-left corner.
+${mermaidInstruction}
+
+Each slide: slideNumber, title, content (formula-heavy), bulletPoints (3-5), narrationText (60-100 words). Narration MUST be spoken text. NO LaTeX/Math symbols.
+
+Structure: Slide 1 intro, 2-3 core concepts, 4-5 rules, 6-7 examples, 8-9 advanced, 10 summary.
+${ragSection}
+${problemInstruction}
+${styleInstruction}
+Tone: ${toneLabel}
+
+Return ONLY valid JSON. Format:
+{"slides": [{"slideNumber": 1, "title": "...", "content": "...", "bulletPoints": ["..."], "narrationText": "..."}]}`;
+  } else {
+    // ══ ORIGINAL MODE: No RAG context ══
+    systemPrompt = language === 'tr'
+      ? `Sen deneyimli bir öğretmensin. Verilen konu ve açıklamaya göre TAM OLARAK 10 slaytlık görsel açıdan zengin, formül ve şablon ağırlıklı profesyonel bir ders sunumu oluştur.
 
 KRİTİK KURALLAR:
 1. İçerik FORMÜL VE GÖRSEL AĞIRLIKLI olmalı. Uzun düz cümleler yerine formüller, denklemler, tablolar, adım adım çözümler kullan.
@@ -93,13 +218,14 @@ KRİTİK KURALLAR:
 3. KaTeX formüllerinde backslash'leri ÇİFT yaz: \\\\frac, \\\\sqrt, \\\\int, \\\\sum, \\\\text, \\\\left, \\\\right, \\\\cdot, \\\\times, \\\\leq, \\\\geq, \\\\neq, \\\\alpha, \\\\beta, \\\\theta, \\\\pi, \\\\infty vb. Bu JSON uyumluluğu için zorunlu.
 4. Inline formül: $...$, Blok formül: $$...$$
 5. Sol alt köşeye yakın metin yazma (orada öğretmen videosu gösterilecek).
+${mermaidInstruction}
 
 Her slayt şunları içermeli:
 - slideNumber: Slayt numarası (1-10)
 - title: Slayt başlığı
 - content: ANA İÇERİK. Formül ağırlıklı olmalı. Kısa açıklayıcı cümleler + çokça KaTeX formül/denklem. Adım adım çözümlerde her adımı ayrı satırda formülle göster. Düz metin az, formül çok olmalı. Satır atlamaları için \\n kullan.
 - bulletPoints: 3-5 kısa madde. Her madde bir anahtar kural veya formül içersin.
-- narrationText: Öğretmenin söyleyeceği anlatım (60-100 kelime). Samimi, sohbet tarzında. Slayttaki formülleri ve kavramları SÖZLİ olarak açıkla. Selamlama/veda KULLANMA.
+- narrationText: Öğretmenin söyleyeceği anlatım (60-100 kelime). Samimi, sohbet tarzında. Slayttaki formülleri ve kavramları SÖZLÜ olarak açıkla. ASLA LaTeX veya $ sembolü kullanma. Formülleri okunuşuyla yaz. Selamlama/veda KULLANMA.
 
 Sunum yapısı:
 - Slayt 1: Konuya giriş - neden önemli, temel formül/denklem tanıtımı
@@ -114,7 +240,7 @@ Ton: ${toneLabel}
 
 SADECE geçerli JSON döndür, başka hiçbir şey yazma. Format:
 {"slides": [{"slideNumber": 1, "title": "...", "content": "...", "bulletPoints": ["..."], "narrationText": "..."}]}`
-    : `You are an experienced teacher. Create EXACTLY 10 visually rich, formula-heavy, professional lesson slides based on the given topic.
+      : `You are an experienced teacher. Create EXACTLY 10 visually rich, formula-heavy, professional lesson slides based on the given topic.
 
 CRITICAL RULES:
 1. Content must be FORMULA AND VISUAL HEAVY. Use formulas, equations, tables, step-by-step solutions instead of long plain text.
@@ -122,13 +248,14 @@ CRITICAL RULES:
 3. In KaTeX formulas, use DOUBLE backslashes: \\\\frac, \\\\sqrt, \\\\int, \\\\sum, \\\\text, \\\\left, \\\\right, \\\\cdot, \\\\times, \\\\leq, \\\\geq, \\\\neq, \\\\alpha, \\\\beta, \\\\theta, \\\\pi, \\\\infty etc. This is REQUIRED for JSON compatibility.
 4. Inline formula: $...$, Block formula: $$...$$
 5. Do NOT place text near the bottom-left corner (teacher video overlay shown there).
+${mermaidInstruction}
 
 Each slide must contain:
 - slideNumber: Slide number (1-10)
 - title: Slide title
 - content: MAIN CONTENT. Formula-heavy. Short explanatory sentences + many KaTeX formulas/equations. Show each step on a separate line with formulas. Less plain text, more formulas. Use \\n for line breaks.
 - bulletPoints: 3-5 brief items. Each should contain a key rule or formula.
-- narrationText: Teacher narration (60-100 words). Warm, conversational. VERBALLY explain the formulas and concepts on the slide. Do NOT use greetings/farewells.
+- narrationText: Teacher narration (60-100 words). Warm, conversational. VERBALLY explain the formulas. NO LaTeX/Math symbols in narration. Write "equals", "plus" etc. Do NOT use greetings/farewells.
 
 Structure:
 - Slide 1: Introduction - why it matters, key formula preview
@@ -143,6 +270,7 @@ Tone: ${toneLabel}
 
 Return ONLY valid JSON, nothing else. Format:
 {"slides": [{"slideNumber": 1, "title": "...", "content": "...", "bulletPoints": ["..."], "narrationText": "..."}]}`;
+  }
 
   const userPrompt = language === 'tr'
     ? `Konu: ${topic}\n\nAçıklama ve öğretmen notları: ${description}${prompt ? `\n\nEk talimatlar: ${prompt}` : ''}`
@@ -218,7 +346,7 @@ Return ONLY valid JSON, nothing else. Format:
             result.push(ch, next);
             i += 2;
           } else if (
-            (next === 'b' || next === 'f' || next === 'n' || next === 'r' || next === 't') 
+            (next === 'b' || next === 'f' || next === 'n' || next === 'r' || next === 't')
           ) {
             // Could be valid JSON escape OR start of LaTeX command
             // Check if followed by another letter → LaTeX (e.g. \frac, \text, \begin)
@@ -297,12 +425,33 @@ Return ONLY valid JSON, nothing else. Format:
 }
 
 /**
+ * Remove LaTeX symbols and formatting for TTS.
+ * Converts symbols to readable text where possible, or removes them.
+ */
+function cleanTextForTts(text: string): string {
+  return text
+    // Remove inline math delimiters
+    .replace(/\$\$/g, '')
+    .replace(/\$/g, '')
+    // Remove common LaTeX commands
+    .replace(/\\(text|frac|sqrt|cdot|times|hat|vec|bar|mathbf|mathrm|leq|geq|neq|approx|infty|alpha|beta|theta|pi|sigma|delta|gamma|omega)/g, '')
+    .replace(/\\/g, '') // Remove remaining backslashes
+    .replace(/{/g, '').replace(/}/g, '') // Remove braces
+    .replace(/\[/g, '').replace(/\]/g, '') // Remove brackets
+    .replace(/\*/g, '') // Remove asterisks
+    .replace(/_/g, ' ') // Replace underscores with space
+    .replace(/\^/g, '') // Remove carets
+    .trim();
+}
+
+/**
  * Convert text to speech using fal-ai/elevenlabs TTS
  */
 async function textToSpeech(
-  text: string,
+  rawText: string,
   language: 'tr' | 'en'
 ): Promise<{ audio_url: string }> {
+  const text = cleanTextForTts(rawText);
   const modelPath = 'fal-ai/elevenlabs/text-to-dialogue/eleven-v3';
 
   const result = await falRequest<{ audio: { url: string } }>(
@@ -434,8 +583,39 @@ export async function POST(request: NextRequest) {
       includesProblemSolving = false,
       problemCount,
       difficulty,
-      step, // 'slides', 'tts_slide', 'tts_batch', 'lipsync'
+      step, // 'slides', 'tts_slide', 'tts_batch', 'lipsync', 'rag_retrieve'
+      ragContext,
+      sourceOnly,
+      teacherId,
+      documentIds,
+      query,
     } = body;
+
+    // Step: Retrieve RAG context from Pinecone
+    if (step === 'rag_retrieve') {
+      if (!query || !teacherId) {
+        return NextResponse.json(
+          { error: 'query and teacherId are required' },
+          { status: 400 }
+        );
+      }
+
+      if (!isRagConfigured()) {
+        return NextResponse.json(
+          { error: 'RAG services are not configured' },
+          { status: 503 }
+        );
+      }
+
+      const context = await retrieveContext(
+        query,
+        teacherId,
+        documentIds || undefined,
+        8
+      );
+
+      return NextResponse.json({ context });
+    }
 
     // Step: Generate slides content with LLM
     if (step === 'slides') {
@@ -454,7 +634,9 @@ export async function POST(request: NextRequest) {
         tone,
         includesProblemSolving,
         problemCount,
-        difficulty
+        difficulty,
+        ragContext,
+        sourceOnly
       );
 
       return NextResponse.json({
