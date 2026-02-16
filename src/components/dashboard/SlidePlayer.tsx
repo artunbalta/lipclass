@@ -12,6 +12,7 @@ import {
   Minimize,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import Hls from 'hls.js';
 import SlideRenderer from './SlideRenderer';
 import type { SlidesData } from '@/types';
 
@@ -59,6 +60,7 @@ export default function SlidePlayer({
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const hlsRef = useRef<Hls | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const slides = slidesData.slides;
@@ -84,6 +86,7 @@ export default function SlidePlayer({
   }, [hasLipsync]);
 
   // ── Load media on slide change ──
+  // ── Load media on slide change ──
   useEffect(() => {
     const audio = audioRef.current;
     const video = videoRef.current;
@@ -92,17 +95,33 @@ export default function SlidePlayer({
     setMediaProgress(0);
     setMediaDuration(0);
 
+    // Clean up previous HLS instance
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+
     if (hasLipsync) {
       // LIPSYNC MODE: video is primary (contains audio)
       if (audio) {
         audio.src = '';
         audio.pause();
       }
-      if (video) {
-        video.src = currentSlide.videoUrl!;
+      if (video && videoSrc) {
+        if (Hls.isSupported() && videoSrc.includes('.m3u8')) {
+          // HLS.js support
+          const hls = new Hls();
+          hls.loadSource(videoSrc);
+          hls.attachMedia(video);
+          hlsRef.current = hls;
+        } else {
+          // Native HLS (Safari) or standard MP4
+          video.src = videoSrc;
+        }
+
         video.muted = isMuted;
         video.loop = false;
-        video.load();
+        // video.load() call is handled by HLS attach or src change
       }
     } else {
       // FALLBACK MODE: audio is primary, video loops reference
@@ -135,7 +154,7 @@ export default function SlidePlayer({
       }, 100);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentSlideIndex]);
+  }, [currentSlideIndex, videoSrc, hasLipsync, referenceVideoUrl]);
 
   // ── Media event handlers (attached to primary media) ──
   useEffect(() => {
@@ -510,10 +529,10 @@ export default function SlidePlayer({
                   key={idx}
                   onClick={() => handleSlideSelect(idx)}
                   className={`w-2 h-2 rounded-full transition-all ${idx === currentSlideIndex
-                      ? 'bg-primary w-4'
-                      : idx < currentSlideIndex
-                        ? 'bg-primary/50'
-                        : 'bg-gray-600'
+                    ? 'bg-primary w-4'
+                    : idx < currentSlideIndex
+                      ? 'bg-primary/50'
+                      : 'bg-gray-600'
                     } ${slide.videoUrl ? 'ring-1 ring-emerald-400/50' : ''}`}
                   title={`Slayt ${idx + 1}${slide.videoUrl ? ' (lipsync)' : ''}`}
                 />
