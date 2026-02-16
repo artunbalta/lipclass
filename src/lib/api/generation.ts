@@ -226,13 +226,75 @@ export async function generateVideo(options: GenerationOptions): Promise<SlidesD
 
     const slidesData: SlidesData = { slides: slidesWithAudio };
 
-    // ━━━ Stage 4: Save to database (93-100%) ━━━
-    onProgress?.({ stage: 'saving', progress: 95 });
+    // ━━━ Stage 4: Bunny Stream Ingestion (93-97%) — only if enabled ━━━
+    let videoProvider: 'fal' | 'bunny' = 'fal';
+    let bunnyIngestionStatus: 'pending' | 'success' | 'failed' | null = null;
+
+    try {
+      const bunnyCheckResponse = await fetch('/api/generate-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          step: 'bunny_ingest_batch',
+          slides: slidesData.slides.map((s) => ({
+            slideNumber: s.slideNumber,
+            videoUrl: s.videoUrl,
+          })),
+          videoTitle: topic,
+        }),
+      });
+
+      if (bunnyCheckResponse.ok) {
+        const { ingestionResults } = (await bunnyCheckResponse.json()) as {
+          ingestionResults: Array<{
+            slideNumber: number;
+            bunnyVideoGuid: string;
+            bunnyEmbedUrl: string;
+            status: 'success' | 'failed' | 'skipped';
+          }>;
+        };
+
+        // Merge Bunny data into slides
+        for (const result of ingestionResults) {
+          const slide = slidesData.slides.find((s) => s.slideNumber === result.slideNumber);
+          if (slide && result.status === 'success') {
+            slide.bunnyVideoGuid = result.bunnyVideoGuid;
+            slide.bunnyEmbedUrl = result.bunnyEmbedUrl;
+          }
+        }
+
+        const successCount = ingestionResults.filter((r) => r.status === 'success').length;
+        const totalIngested = ingestionResults.filter((r) => r.status !== 'skipped').length;
+
+        if (successCount > 0) {
+          videoProvider = 'bunny';
+          bunnyIngestionStatus = successCount === totalIngested ? 'success' : 'pending';
+          console.log(`[Generation] Bunny ingestion: ${successCount}/${totalIngested} slides`);
+        } else if (totalIngested > 0) {
+          bunnyIngestionStatus = 'failed';
+          console.warn('[Generation] Bunny ingestion: all slides failed');
+        }
+      } else {
+        // Bunny not enabled or request failed — this is fine, fall back to fal
+        const errBody = await bunnyCheckResponse.json().catch(() => ({}));
+        console.log(`[Generation] Bunny ingestion skipped: ${errBody?.error || bunnyCheckResponse.statusText}`);
+      }
+    } catch (bunnyError) {
+      console.warn('[Generation] Bunny ingestion error (non-fatal):', bunnyError);
+      // Non-fatal — video still works via fal URLs
+    }
+
+    onProgress?.({ stage: 'saving', progress: 97 });
+
+    // ━━━ Stage 5: Save to database (97-100%) ━━━
+    onProgress?.({ stage: 'saving', progress: 98 });
 
     await updateVideo(videoId, {
       slidesData,
       status: 'published',
       duration: slides.length * 30, // Rough estimate: ~30 sec per slide
+      videoProvider,
+      bunnyIngestionStatus,
     } as any);
 
     console.log('[Generation] Slides saved to database');

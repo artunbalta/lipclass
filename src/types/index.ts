@@ -33,6 +33,8 @@ export interface Slide {
   narrationText: string; // What the teacher says for this slide (also used for lipsync)
   audioUrl?: string; // TTS audio URL for this slide
   videoUrl?: string; // Per-slide lipsync video URL (future: generated from narrationText + reference video)
+  bunnyVideoGuid?: string; // Bunny Stream video GUID (when provider=bunny)
+  bunnyEmbedUrl?: string; // Bunny Stream embed URL (when provider=bunny)
 }
 
 export interface SlidesData {
@@ -61,6 +63,8 @@ export interface Video {
   includesProblemSolving: boolean;
   problemCount?: number;
   difficulty?: 'easy' | 'medium' | 'hard';
+  videoProvider?: 'fal' | 'bunny';
+  bunnyIngestionStatus?: 'pending' | 'success' | 'failed' | null;
 }
 
 export interface VideoStats {
@@ -128,7 +132,7 @@ export interface Feature {
 }
 
 // Subject Type
-export type Subject = 
+export type Subject =
   | 'Matematik'
   | 'Fizik'
   | 'Kimya'

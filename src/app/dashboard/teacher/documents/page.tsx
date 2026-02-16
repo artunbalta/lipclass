@@ -14,6 +14,7 @@ import {
     FileUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { useAuthStore } from '@/stores/auth-store';
 
 interface TeacherDocument {
@@ -73,6 +74,8 @@ export default function DocumentsPage() {
     const [error, setError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    const [uploadProgress, setUploadProgress] = useState(0);
+
     // ── Fetch documents ──
     const fetchDocuments = useCallback(async () => {
         if (!user?.id) return;
@@ -95,6 +98,7 @@ export default function DocumentsPage() {
     const uploadFile = async (file: File) => {
         if (!user?.id) return;
         setIsUploading(true);
+        setUploadProgress(0);
         setError(null);
 
         try {
@@ -102,20 +106,45 @@ export default function DocumentsPage() {
             formData.append('file', file);
             formData.append('teacherId', user.id);
 
-            const res = await fetch('/api/documents', {
-                method: 'POST',
-                body: formData,
+            return new Promise<void>((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', '/api/documents');
+
+                xhr.upload.onprogress = (event) => {
+                    if (event.lengthComputable) {
+                        const percentComplete = (event.loaded / event.total) * 100;
+                        setUploadProgress(percentComplete);
+                    }
+                };
+
+                xhr.onload = async () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        await fetchDocuments();
+                        resolve();
+                    } else {
+                        try {
+                            const data = JSON.parse(xhr.responseText);
+                            reject(new Error(data.error || 'Yükleme başarısız'));
+                        } catch {
+                            reject(new Error('Yükleme başarısız'));
+                        }
+                    }
+                    setIsUploading(false);
+                    setUploadProgress(0);
+                };
+
+                xhr.onerror = () => {
+                    reject(new Error('Ağ hatası oluştu'));
+                    setIsUploading(false);
+                    setUploadProgress(0);
+                };
+
+                xhr.send(formData);
             });
-
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Yükleme başarısız');
-
-            // Refresh list
-            await fetchDocuments();
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Yükleme başarısız');
-        } finally {
             setIsUploading(false);
+            setUploadProgress(0);
         }
     };
 
@@ -230,8 +259,8 @@ export default function DocumentsPage() {
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
                 className={`relative border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all duration-200 mb-8 ${isDragging
-                        ? 'border-primary bg-primary/5 scale-[1.01]'
-                        : 'border-border hover:border-primary/50 hover:bg-muted/30'
+                    ? 'border-primary bg-primary/5 scale-[1.01]'
+                    : 'border-border hover:border-primary/50 hover:bg-muted/30'
                     }`}
             >
                 <input
@@ -243,9 +272,18 @@ export default function DocumentsPage() {
                 />
 
                 {isUploading ? (
-                    <div className="flex flex-col items-center gap-3">
-                        <Loader2 className="w-10 h-10 text-primary animate-spin" />
-                        <p className="text-sm text-muted-foreground">Yükleniyor...</p>
+                    <div className="flex flex-col items-center gap-3 w-full max-w-xs">
+                        <div className="flex items-center gap-2 w-full">
+                            <Progress value={uploadProgress === 100 ? undefined : uploadProgress} className="h-2" />
+                            <span className="text-xs text-muted-foreground w-12 text-right">
+                                {uploadProgress === 100 ? '' : `${Math.round(uploadProgress)}%`}
+                            </span>
+                        </div>
+                        <p className="text-sm text-muted-foreground animate-pulse text-center">
+                            {uploadProgress === 100
+                                ? 'Sunucuya kaydediliyor... Lütfen bekleyin.'
+                                : 'Yükleniyor...'}
+                        </p>
                     </div>
                 ) : (
                     <div className="flex flex-col items-center gap-3">
@@ -257,7 +295,7 @@ export default function DocumentsPage() {
                                 Dosya sürükleyin veya tıklayın
                             </p>
                             <p className="text-sm text-muted-foreground mt-1">
-                                PDF, TXT, Markdown veya DOCX • Maks. 20MB
+                                PDF, TXT, Markdown veya DOCX • Maks. 200MB
                             </p>
                         </div>
                     </div>

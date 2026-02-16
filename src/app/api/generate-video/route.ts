@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { retrieveContext, isRagConfigured } from '@/lib/api/rag';
+import { isBunnyEnabled } from '@/lib/config/bunny-config';
+import { ingestFromUrl } from '@/lib/api/bunny-stream';
 
 // Fal AI API endpoints
 const FAL_API_BASE = 'https://fal.run';
@@ -718,9 +720,86 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Step: Bunny Stream batch ingestion — upload each slide's lipsync video to Bunny
+    if (step === 'bunny_ingest_batch') {
+      if (!isBunnyEnabled()) {
+        return NextResponse.json(
+          { error: 'Bunny Stream is not enabled. Set VIDEO_DELIVERY_PROVIDER=bunny.' },
+          { status: 400 }
+        );
+      }
+
+      const { slides, videoTitle } = body;
+      if (!slides || !Array.isArray(slides)) {
+        return NextResponse.json(
+          { error: 'slides array is required for Bunny ingestion' },
+          { status: 400 }
+        );
+      }
+
+      console.log(`[BunnyIngest] Starting batch ingestion for ${slides.length} slides`);
+
+      const results: Array<{
+        slideNumber: number;
+        bunnyVideoGuid: string;
+        bunnyEmbedUrl: string;
+        status: 'success' | 'failed' | 'skipped';
+        error?: string;
+      }> = [];
+
+      for (const slide of slides) {
+        // Only ingest slides that have a video URL (lipsync output)
+        if (!slide.videoUrl) {
+          results.push({
+            slideNumber: slide.slideNumber,
+            bunnyVideoGuid: '',
+            bunnyEmbedUrl: '',
+            status: 'skipped',
+          });
+          continue;
+        }
+
+        try {
+          const title = `${videoTitle || 'Lesson'} - Slide ${slide.slideNumber}`;
+          const result = await ingestFromUrl(slide.videoUrl, title);
+
+          results.push({
+            slideNumber: slide.slideNumber,
+            bunnyVideoGuid: result.guid,
+            bunnyEmbedUrl: result.embedUrl,
+            status: result.status,
+            error: result.error,
+          });
+
+          console.log(
+            `[BunnyIngest] Slide ${slide.slideNumber}: ${result.status}${result.guid ? ` (guid=${result.guid})` : ''}`
+          );
+        } catch (err) {
+          const errorMsg = err instanceof Error ? err.message : String(err);
+          console.error(`[BunnyIngest] Slide ${slide.slideNumber} error:`, errorMsg);
+          results.push({
+            slideNumber: slide.slideNumber,
+            bunnyVideoGuid: '',
+            bunnyEmbedUrl: '',
+            status: 'failed',
+            error: errorMsg,
+          });
+        }
+      }
+
+      const successCount = results.filter((r) => r.status === 'success').length;
+      const totalWithVideo = results.filter((r) => r.status !== 'skipped').length;
+      console.log(`[BunnyIngest] Batch complete: ${successCount}/${totalWithVideo} succeeded`);
+
+      return NextResponse.json({
+        ingestionResults: results,
+        stage: 'bunny_ingest_complete',
+      });
+    }
+
     // Unknown step
     return NextResponse.json(
-      { error: `Unknown step: ${step}. Use 'slides', 'tts_slide', 'tts_batch', or 'lipsync'.` },
+      { error: `Unknown step: ${step}. Use 'slides', 'tts_slide', 'tts_batch', 'lipsync', or 'bunny_ingest_batch'.` },
       { status: 400 }
     );
   } catch (error) {

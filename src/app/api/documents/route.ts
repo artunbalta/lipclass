@@ -19,16 +19,25 @@ function getSupabaseAdmin() {
 
 export async function POST(request: NextRequest) {
     try {
+        console.log('[Documents] Upload request started');
         const formData = await request.formData();
         const file = formData.get('file') as File | null;
         const teacherId = formData.get('teacherId') as string | null;
 
         if (!file || !teacherId) {
+            console.error('[Documents] Missing file or teacherId');
             return NextResponse.json(
                 { error: 'file and teacherId are required' },
                 { status: 400 }
             );
         }
+
+        console.log('[Documents] File received:', {
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            teacherId
+        });
 
         // Validate file type
         const allowedTypes = [
@@ -38,28 +47,46 @@ export async function POST(request: NextRequest) {
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         ];
         if (!allowedTypes.includes(file.type)) {
+            console.error('[Documents] Invalid file type:', file.type);
             return NextResponse.json(
                 { error: 'Desteklenmeyen dosya formatı. PDF, TXT veya DOCX yükleyin.' },
                 { status: 400 }
             );
         }
 
-        // Max 20 MB
-        if (file.size > 20 * 1024 * 1024) {
+        // Max 200 MB
+        if (file.size > 200 * 1024 * 1024) {
+            console.error('[Documents] File too large:', file.size);
             return NextResponse.json(
-                { error: 'Dosya boyutu 20MB\'dan büyük olamaz.' },
+                { error: 'Dosya boyutu 200MB\'dan büyük olamaz.' },
                 { status: 400 }
             );
         }
 
         const supabase = getSupabaseAdmin();
 
-        // Generate unique filename
-        const ext = file.name.split('.').pop() || 'pdf';
-        const storagePath = `${teacherId}/${Date.now()}.${ext}`;
+        // Generate unique filename with sanitized extension
+        const originalName = file.name;
+        // Get extension, default to bin if missing. Lowercase it.
+        const ext = (originalName.split('.').pop() || 'bin').toLowerCase();
+        // Sanitize extension to be safe (alphanumeric only)
+        const safeExt = ext.replace(/[^a-z0-9]/g, '');
+
+        // Create storage path
+        const storagePath = `${teacherId}/${Date.now()}.${safeExt}`;
+
+        console.log('[Documents] Uploading to storage:', storagePath);
 
         // Upload to Supabase Storage
-        const buffer = Buffer.from(await file.arrayBuffer());
+        let buffer: Buffer;
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            buffer = Buffer.from(arrayBuffer);
+        } catch (err) {
+            console.error('[Documents] Failed to convert file to buffer:', err);
+            throw new Error('Dosya okunamadı');
+        }
+
         const { error: uploadError } = await supabase.storage
             .from('teacher-documents')
             .upload(storagePath, buffer, {
@@ -68,8 +95,11 @@ export async function POST(request: NextRequest) {
             });
 
         if (uploadError) {
+            console.error('[Documents] Storage upload failed:', uploadError);
             throw new Error(`Storage upload failed: ${uploadError.message}`);
         }
+
+        console.log('[Documents] Storage upload successful');
 
         // Create DB record
         const { data: doc, error: dbError } = await supabase
@@ -87,11 +117,13 @@ export async function POST(request: NextRequest) {
             .single();
 
         if (dbError) {
+            console.error('[Documents] Database insert failed:', dbError);
             // Cleanup: remove uploaded file
             await supabase.storage.from('teacher-documents').remove([storagePath]);
             throw new Error(`Database insert failed: ${dbError.message}`);
         }
 
+        console.log('[Documents] Success:', doc.id);
         return NextResponse.json({ document: doc });
     } catch (error) {
         console.error('[Documents] Upload error:', error);

@@ -66,10 +66,17 @@ export default function SlidePlayer({
   const totalSlides = slides.length;
 
   // Determine playback mode for current slide
-  const hasLipsync = !!currentSlide?.videoUrl;
-  const videoSrc = hasLipsync
-    ? currentSlide.videoUrl! // Lipsync video (has embedded audio)
-    : referenceVideoUrl || null; // Fallback: reference video (muted loop)
+  const hasLipsync = !!currentSlide?.videoUrl || !!currentSlide?.bunnyEmbedUrl;
+
+  // Prefer Bunny URL when available; fall back to fal.media URL; then reference video
+  const videoSrc = currentSlide?.bunnyEmbedUrl
+    ? currentSlide.bunnyEmbedUrl // Bunny Stream embed/HLS URL
+    : hasLipsync && currentSlide?.videoUrl
+      ? currentSlide.videoUrl // fal.media lipsync video
+      : referenceVideoUrl || null; // Fallback: reference video (muted loop)
+
+  // Track whether we're using Bunny for this slide (for badge display)
+  const isBunnySource = !!currentSlide?.bunnyEmbedUrl;
 
   // Helper: get the primary media element (video for lipsync, audio for fallback)
   const getPrimaryMedia = useCallback((): HTMLMediaElement | null => {
@@ -123,7 +130,7 @@ export default function SlidePlayer({
         primary?.play().catch(() => setIsPlaying(false));
         // In fallback mode, also start the reference video
         if (!hasLipsync && videoRef.current) {
-          videoRef.current.play().catch(() => {});
+          videoRef.current.play().catch(() => { });
         }
       }, 100);
     }
@@ -176,12 +183,12 @@ export default function SlidePlayer({
     if (!video || !referenceVideoUrl) return;
 
     const handleCanPlay = () => {
-      if (isPlaying) video.play().catch(() => {});
+      if (isPlaying) video.play().catch(() => { });
     };
 
     video.addEventListener('canplay', handleCanPlay);
     if (video.readyState >= 3 && isPlaying) {
-      video.play().catch(() => {});
+      video.play().catch(() => { });
     }
 
     return () => video.removeEventListener('canplay', handleCanPlay);
@@ -199,7 +206,7 @@ export default function SlidePlayer({
     } else {
       setIsPlaying(true);
       primary?.play().catch(() => setIsPlaying(false));
-      if (!hasLipsync) video?.play().catch(() => {}); // Also play fallback video
+      if (!hasLipsync) video?.play().catch(() => { }); // Also play fallback video
     }
   }, [isPlaying, hasLipsync, getPrimaryMedia]);
 
@@ -222,10 +229,10 @@ export default function SlidePlayer({
   const handleToggleFullscreen = useCallback(() => {
     if (!containerRef.current) return;
     if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen().catch(() => {});
+      containerRef.current.requestFullscreen().catch(() => { });
       setIsFullscreen(true);
     } else {
-      document.exitFullscreen().catch(() => {});
+      document.exitFullscreen().catch(() => { });
       setIsFullscreen(false);
     }
   }, []);
@@ -370,9 +377,8 @@ export default function SlidePlayer({
   return (
     <div
       ref={containerRef}
-      className={`slide-player relative bg-gray-950 rounded-xl overflow-hidden ${className} ${
-        isFullscreen ? 'fixed inset-0 z-50 rounded-none' : ''
-      }`}
+      className={`slide-player relative bg-gray-950 rounded-xl overflow-hidden ${className} ${isFullscreen ? 'fixed inset-0 z-50 rounded-none' : ''
+        }`}
     >
       {/* Hidden audio element (only used in fallback mode) */}
       <audio ref={audioRef} preload="auto" />
@@ -390,17 +396,16 @@ export default function SlidePlayer({
             ref={videoOverlayRef}
             onMouseDown={handleDragStart}
             onTouchStart={handleDragStart}
-            className={`w-44 h-28 sm:w-56 sm:h-36 rounded-lg overflow-hidden shadow-2xl border-2 border-white/20 z-10 bg-black select-none ${
-              isDragging ? 'cursor-grabbing opacity-90 scale-105' : 'cursor-grab'
-            } ${dragPos ? 'fixed' : `absolute ${cornerClasses[videoCorner]}`}`}
+            className={`w-44 h-28 sm:w-56 sm:h-36 rounded-lg overflow-hidden shadow-2xl border-2 border-white/20 z-10 bg-black select-none ${isDragging ? 'cursor-grabbing opacity-90 scale-105' : 'cursor-grab'
+              } ${dragPos ? 'fixed' : `absolute ${cornerClasses[videoCorner]}`}`}
             style={
               dragPos
                 ? {
-                    left: dragPos.x,
-                    top: dragPos.y,
-                    transition: 'none',
-                    zIndex: 50,
-                  }
+                  left: dragPos.x,
+                  top: dragPos.y,
+                  transition: 'none',
+                  zIndex: 50,
+                }
                 : { transition: 'all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)' }
             }
           >
@@ -504,13 +509,12 @@ export default function SlidePlayer({
                 <button
                   key={idx}
                   onClick={() => handleSlideSelect(idx)}
-                  className={`w-2 h-2 rounded-full transition-all ${
-                    idx === currentSlideIndex
+                  className={`w-2 h-2 rounded-full transition-all ${idx === currentSlideIndex
                       ? 'bg-primary w-4'
                       : idx < currentSlideIndex
-                      ? 'bg-primary/50'
-                      : 'bg-gray-600'
-                  } ${slide.videoUrl ? 'ring-1 ring-emerald-400/50' : ''}`}
+                        ? 'bg-primary/50'
+                        : 'bg-gray-600'
+                    } ${slide.videoUrl ? 'ring-1 ring-emerald-400/50' : ''}`}
                   title={`Slayt ${idx + 1}${slide.videoUrl ? ' (lipsync)' : ''}`}
                 />
               ))}

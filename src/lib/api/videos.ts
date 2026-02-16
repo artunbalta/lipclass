@@ -108,7 +108,7 @@ export async function createVideo(teacherId: string, videoData: CreateVideoFormD
 
 export async function updateVideo(id: string, updates: Partial<Video>) {
   const updatePayload: Record<string, unknown> = {};
-  
+
   if (updates.title !== undefined) updatePayload.title = updates.title;
   if (updates.description !== undefined) updatePayload.description = updates.description;
   if (updates.status !== undefined) updatePayload.status = updates.status;
@@ -116,6 +116,8 @@ export async function updateVideo(id: string, updates: Partial<Video>) {
   if (updates.videoUrl !== undefined) updatePayload.video_url = updates.videoUrl;
   if (updates.duration !== undefined) updatePayload.duration = updates.duration;
   if (updates.slidesData !== undefined) updatePayload.slides_data = updates.slidesData;
+  if (updates.videoProvider !== undefined) updatePayload.video_provider = updates.videoProvider;
+  if (updates.bunnyIngestionStatus !== undefined) updatePayload.bunny_ingestion_status = updates.bunnyIngestionStatus;
 
   const { data, error } = await supabase
     .from('videos')
@@ -236,5 +238,7 @@ function mapDbVideoToVideo(dbVideo: any): Video {
     includesProblemSolving: dbVideo.includes_problem_solving || false,
     problemCount: dbVideo.problem_count || undefined,
     difficulty: dbVideo.difficulty || undefined,
+    videoProvider: dbVideo.video_provider || 'fal',
+    bunnyIngestionStatus: dbVideo.bunny_ingestion_status || null,
   };
 }
