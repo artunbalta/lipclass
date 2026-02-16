@@ -766,7 +766,7 @@ export async function POST(request: NextRequest) {
           results.push({
             slideNumber: slide.slideNumber,
             bunnyVideoGuid: result.guid,
-            bunnyEmbedUrl: result.embedUrl,
+            bunnyEmbedUrl: result.hlsUrl,
             status: result.status,
             error: result.error,
           });

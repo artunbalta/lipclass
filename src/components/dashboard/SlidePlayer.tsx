@@ -61,6 +61,7 @@ export default function SlidePlayer({
   const audioRef = useRef<HTMLAudioElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
+  const isPlayingRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const slides = slidesData.slides;
@@ -86,7 +87,6 @@ export default function SlidePlayer({
   }, [hasLipsync]);
 
   // ── Load media on slide change ──
-  // ── Load media on slide change ──
   useEffect(() => {
     const audio = audioRef.current;
     const video = videoRef.current;
@@ -108,20 +108,50 @@ export default function SlidePlayer({
         audio.pause();
       }
       if (video && videoSrc) {
-        if (Hls.isSupported() && videoSrc.includes('.m3u8')) {
-          // HLS.js support
-          const hls = new Hls();
+        const isHlsUrl = videoSrc.includes('.m3u8');
+
+        if (Hls.isSupported() && isHlsUrl) {
+          // HLS.js support (Chrome, Firefox, Edge)
+          const hls = new Hls({
+            startLevel: -1, // Auto quality
+            capLevelToPlayerSize: true,
+          });
           hls.loadSource(videoSrc);
           hls.attachMedia(video);
           hlsRef.current = hls;
-        } else {
-          // Native HLS (Safari) or standard MP4
-          video.src = videoSrc;
-        }
 
-        video.muted = isMuted;
-        video.loop = false;
-        // video.load() call is handled by HLS attach or src change
+          // Wait for manifest to parse before attempting play
+          hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            video.muted = isMuted;
+            video.loop = false;
+            // If user was already playing, auto-play now that manifest is ready
+            if (isPlayingRef.current) {
+              video.play().catch(() => setIsPlaying(false));
+            }
+          });
+
+          hls.on(Hls.Events.ERROR, (_event, data) => {
+            if (data.fatal) {
+              console.error('[SlidePlayer] Fatal HLS error:', data.type, data.details);
+              // Try to recover
+              if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                hls.startLoad();
+              } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                hls.recoverMediaError();
+              }
+            }
+          });
+        } else if (video.canPlayType('application/vnd.apple.mpegurl') && isHlsUrl) {
+          // Native HLS (Safari)
+          video.src = videoSrc;
+          video.muted = isMuted;
+          video.loop = false;
+        } else {
+          // Standard MP4
+          video.src = videoSrc;
+          video.muted = isMuted;
+          video.loop = false;
+        }
       }
     } else {
       // FALLBACK MODE: audio is primary, video loops reference
@@ -142,8 +172,8 @@ export default function SlidePlayer({
       }
     }
 
-    // Auto-play if player was in playing state
-    if (isPlaying) {
+    // Auto-play if player was in playing state (non-HLS paths)
+    if (isPlaying && !(videoSrc?.includes('.m3u8') && Hls.isSupported())) {
       setTimeout(() => {
         const primary = hasLipsync ? videoRef.current : audioRef.current;
         primary?.play().catch(() => setIsPlaying(false));
@@ -222,9 +252,14 @@ export default function SlidePlayer({
       primary?.pause();
       if (!hasLipsync) video?.pause(); // Also pause fallback video
       setIsPlaying(false);
+      isPlayingRef.current = false;
     } else {
       setIsPlaying(true);
-      primary?.play().catch(() => setIsPlaying(false));
+      isPlayingRef.current = true;
+      primary?.play().catch(() => {
+        setIsPlaying(false);
+        isPlayingRef.current = false;
+      });
       if (!hasLipsync) video?.play().catch(() => { }); // Also play fallback video
     }
   }, [isPlaying, hasLipsync, getPrimaryMedia]);

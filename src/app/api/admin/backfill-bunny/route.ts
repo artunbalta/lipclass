@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { ingestFromUrl } from '@/lib/api/bunny-stream';
+import { ingestFromUrl, getHlsUrl } from '@/lib/api/bunny-stream';
 import { isBunnyEnabled } from '@/lib/config/bunny-config';
 import { Slide, Video, SlidesData } from '@/types';
 
@@ -48,6 +48,8 @@ export async function GET(request: NextRequest) {
         }
 
         // 3. Fetch Candidate Videos
+        // We fetch videos that are EITHER partially migrated OR fully migrated (to repair URLs)
+        // Actually, let's just fetch recent videos and check them.
         const limit = parseInt(searchParams.get('limit') || '5', 10);
         const dryRun = searchParams.get('dryRun') === 'true';
 
@@ -56,13 +58,13 @@ export async function GET(request: NextRequest) {
         const { data: videos, error } = await supabase
             .from('videos')
             .select('*')
-            .neq('video_provider', 'bunny') // Only process videos not yet fully migrated
-            .order('created_at', { ascending: false }) // Process newest first
+            // remove .neq constraint to allow re-checking migrated videos for repair
+            .order('created_at', { ascending: false })
             .limit(limit);
 
         if (error) throw error;
         if (!videos || videos.length === 0) {
-            return NextResponse.json({ message: 'No videos found needing migration' });
+            return NextResponse.json({ message: 'No videos found' });
         }
 
         const results = [];
@@ -78,7 +80,7 @@ export async function GET(request: NextRequest) {
             }
 
             let updated = false;
-            let successCount = 0;
+            let successCount = 0; // successfully ingested or repaired
             let failCount = 0;
 
             // Process Slides
@@ -86,7 +88,22 @@ export async function GET(request: NextRequest) {
             const slides = slidesData.slides || [];
 
             for (const slide of slides) {
-                // If slide has a video URL but no Bunny GUID, ingest it
+                let slideChanged = false;
+
+                // 1. Repair Mode: Fix existing Iframe URLs to HLS URLs
+                // If we have a GUID but the URL is an iframe URL (contains 'iframe.mediadelivery.net')
+                if (slide.bunnyVideoGuid && slide.bunnyEmbedUrl && slide.bunnyEmbedUrl.includes('iframe.mediadelivery.net')) {
+                    const hlsUrl = getHlsUrl(slide.bunnyVideoGuid);
+                    if (hlsUrl) {
+                        console.log(`[Backfill] Fixing URL for slide ${slide.slideNumber}: ${slide.bunnyEmbedUrl} -> ${hlsUrl}`);
+                        slide.bunnyEmbedUrl = hlsUrl;
+                        slideChanged = true;
+                        updated = true;
+                        successCount++; // Count as success (repair)
+                    }
+                }
+
+                // 2. Ingestion Mode: If slide has a video URL but no Bunny GUID, ingest it
                 if (slide.videoUrl && !slide.bunnyVideoGuid) {
                     try {
                         const title = `${dbVideo.title || 'Lesson'} - Slide ${slide.slideNumber}`;
@@ -104,7 +121,7 @@ export async function GET(request: NextRequest) {
                                 updatedSlides.push({
                                     ...slide,
                                     bunnyVideoGuid: ingestion.guid,
-                                    bunnyEmbedUrl: ingestion.embedUrl,
+                                    bunnyEmbedUrl: ingestion.hlsUrl, // Use HLS URL!
                                 });
                                 updated = true;
                                 successCount++;
@@ -120,7 +137,9 @@ export async function GET(request: NextRequest) {
                         console.error(`[Backfill] Error processing slide ${slide.slideNumber}:`, err);
                     }
                 } else {
-                    updatedSlides.push(slide); // Already migrated or no video
+                    // If slide changed (repair), push the modified slide.
+                    // If not changed, push original.
+                    updatedSlides.push(slide);
                 }
             }
 
@@ -139,7 +158,7 @@ export async function GET(request: NextRequest) {
                         .from('videos')
                         .update({
                             slides_data: { ...slidesData, slides: updatedSlides },
-                            video_provider: isComplete ? 'bunny' : 'fal',
+                            video_provider: isComplete ? 'bunny' : 'fal', // Ensure fully migrated
                             bunny_ingestion_status: isComplete ? 'success' : 'partial',
                             bunny_ingested_at: new Date().toISOString(),
                         })
@@ -150,14 +169,14 @@ export async function GET(request: NextRequest) {
                     } else {
                         results.push({
                             id: video.id,
-                            status: isComplete ? 'migrated' : 'partial_migration',
+                            status: isComplete ? 'migrated_or_repaired' : 'partial_migration',
                             slides_migrated: successCount,
                             slides_failed: failCount
                         });
                     }
                 }
             } else {
-                results.push({ id: video.id, status: 'no_changes', reason: 'already_migrated_or_failed' });
+                results.push({ id: video.id, status: 'no_changes', reason: 'already_correct' });
             }
         }
 
