@@ -95,7 +95,8 @@ export default function SignUpPage() {
         router.push('/dashboard/student');
       }
     } else {
-      showToast.error('Kayıt başarısız', 'Bu e-posta adresi zaten kullanımda.');
+      const errMsg = useAuthStore.getState().error || 'Kayıt başarısız. Lütfen tekrar deneyin.';
+      showToast.error('Kayıt başarısız', errMsg);
     }
   };
 

@@ -10,8 +10,6 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { SUBJECTS } from '@/lib/constants';
-import { uploadFile } from '@/lib/api/storage';
-import { generateContentWithLLM, textToSpeech, createLipsyncVideo } from '@/lib/api/fal';
 import { toast } from 'sonner';
 
 export function DemoShowcase() {
@@ -24,20 +22,17 @@ export function DemoShowcase() {
     const [resultUrl, setResultUrl] = useState<string>('');
     const [loadingMessage, setLoadingMessage] = useState('');
 
-    // For preview of uploaded video
     const [previewUrl, setPreviewUrl] = useState<string>('');
     const videoRef = useRef<HTMLVideoElement>(null);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = e.target.files?.[0];
         if (selectedFile) {
-            // Check file type
             if (!selectedFile.type.startsWith('video/')) {
                 toast.error('Lütfen geçerli bir video dosyası seçin (MP4, MOV, WebM)');
                 return;
             }
 
-            // Check file size (max 100MB for demo)
             if (selectedFile.size > 100 * 1024 * 1024) {
                 toast.error('Demo için maksimum dosya boyutu 100MB\'dır.');
                 return;
@@ -58,7 +53,7 @@ export function DemoShowcase() {
             return;
         }
 
-        if (videoDuration > 120) { // 2 minutes soft limit warning
+        if (videoDuration > 120) {
             toast.warning('Video süresi 2 dakikadan uzun, işlem biraz zaman alabilir.');
         }
 
@@ -67,62 +62,91 @@ export function DemoShowcase() {
         setLoadingMessage('Video güvenli sunucuya yükleniyor...');
 
         try {
-            // 1. Upload Video
-            const timestamp = Date.now();
-            // Use a specific demo folder in the public bucket to keep things organized
-            // Ensure filename is safe
-            const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-            const path = `demo/${timestamp}_${safeName}`;
+            // 1. Upload Video via server-side API
+            const formData = new FormData();
+            formData.append('file', file);
 
-            // Note: This requires the 'reference-videos' bucket to allow public uploads or anon key uploads
-            // If this fails, we might need a different approach or backend change, but trying standard upload first.
-            const uploadedVideoUrl = await uploadFile('reference-videos', file, path);
+            const uploadRes = await fetch('/api/demo-upload', {
+                method: 'POST',
+                body: formData,
+            });
 
+            if (!uploadRes.ok) {
+                const err = await uploadRes.json().catch(() => ({}));
+                throw new Error(err?.error || 'Video yüklenemedi');
+            }
+
+            const { url: uploadedVideoUrl } = await uploadRes.json();
+
+            // 2. Generate short content via LLM
             setProgressStep('ai');
             setLoadingMessage('Yapay zeka ders içeriği hazırlıyor...');
 
-            // 2. Generate Content (Short for demo)
-            const prompt = `Sen harika bir öğretmensin. Aşağıdaki konu hakkında çok kısa, etkileyici ve anlaşılır bir video ders metni hazırla.
-            
-            Konu: ${topic}
-            Ders: ${subject}
-            
-            Kurallar:
-            1. Sadece anlatılacak metni yaz. Başlık, giriş, "Merhaba arkadaşlar" gibi girişleri veya "Görüşürüz" gibi kapanışları ekleme.
-            2. Maksimum 2-3 cümle olsun. Çok kısa ve öz olsun.
-            3. Doğrudan konuya gir.
-            4. Samimi ve enerjik bir dil kullan.
-            5. Türkçe yaz.
-            `;
-
-            const content = await generateContentWithLLM(prompt, {
-                maxTokens: 500,
-                temperature: 0.7
+            const contentRes = await fetch('/api/generate-video', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    step: 'demo_content',
+                    demoTopic: topic,
+                    demoSubject: subject,
+                    language: 'tr',
+                }),
             });
 
-            console.log('Generated content:', content);
+            if (!contentRes.ok) {
+                const err = await contentRes.json().catch(() => ({}));
+                throw new Error(err?.error || 'İçerik oluşturulamadı');
+            }
 
+            const { text: narrationText } = await contentRes.json();
+            console.log('Generated demo content:', narrationText);
+
+            // 3. Text to Speech
             setProgressStep('tts');
             setLoadingMessage('Metin seslendiriliyor...');
 
-            // 3. Text to Speech
-            const ttsResponse = await textToSpeech(content, {
-                language: 'tr',
-                voice: 'tr-TR-DuyguNeural', // Using standard nice voice
-                speed: 1.1
+            const ttsRes = await fetch('/api/generate-video', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    step: 'tts_slide',
+                    narrationText,
+                    slideNumber: 1,
+                    language: 'tr',
+                }),
             });
 
-            if (!ttsResponse.audio_url) throw new Error('Ses oluşturulamadı');
+            if (!ttsRes.ok) {
+                const err = await ttsRes.json().catch(() => ({}));
+                throw new Error(err?.error || 'Ses oluşturulamadı');
+            }
 
+            const { audio_url } = await ttsRes.json();
+            if (!audio_url) throw new Error('Ses URL\'i alınamadı');
+
+            // 4. Lipsync
             setProgressStep('lipsync');
             setLoadingMessage('Video senkronize ediliyor (Bu işlem 1-2 dakika sürebilir)...');
 
-            // 4. Lipsync
-            const lipsyncResponse = await createLipsyncVideo(uploadedVideoUrl, ttsResponse.audio_url);
+            const lipsyncRes = await fetch('/api/generate-video', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    step: 'lipsync',
+                    video_url: uploadedVideoUrl,
+                    audio_url,
+                }),
+            });
 
-            if (!lipsyncResponse.video_url) throw new Error('Video oluşturulamadı');
+            if (!lipsyncRes.ok) {
+                const err = await lipsyncRes.json().catch(() => ({}));
+                throw new Error(err?.error || 'Video oluşturulamadı');
+            }
 
-            setResultUrl(lipsyncResponse.video_url);
+            const { video_url } = await lipsyncRes.json();
+            if (!video_url) throw new Error('Video URL\'i alınamadı');
+
+            setResultUrl(video_url);
             setStep('completed');
             toast.success('Demo videonuz hazır!');
 
@@ -144,7 +168,6 @@ export function DemoShowcase() {
 
     return (
         <section className="section-padding bg-slate-50 border-t border-slate-100 relative overflow-hidden" id="demo">
-            {/* Background Gradients */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-indigo-100/40 rounded-full blur-3xl pointer-events-none" />
 
             <div className="container relative mx-auto px-4 sm:px-6 lg:px-8">
@@ -161,7 +184,6 @@ export function DemoShowcase() {
                     </p>
                 </div>
 
-                {/* Safari Window Container */}
                 <div className="max-w-5xl mx-auto relative z-10">
                     <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/60 overflow-hidden">
                         {/* Chrome / Title Bar */}
@@ -182,7 +204,6 @@ export function DemoShowcase() {
                             <div className="w-14" />
                         </div>
 
-                        {/* App Content */}
                         <div className="flex flex-col md:flex-row min-h-[550px]">
                             {/* Left Panel: Input */}
                             <div className="flex-1 p-8 border-b md:border-b-0 md:border-r border-slate-100 bg-white">
@@ -410,4 +431,3 @@ export function DemoShowcase() {
         </section>
     );
 }
-

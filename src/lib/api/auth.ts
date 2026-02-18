@@ -62,29 +62,59 @@ export async function signUp(data: {
     throw new Error('Kayıt başarısız');
   }
 
-  // Update profile with additional data
-  const { error: updateError } = await supabase
-    .from('profiles')
-    .update({
-      school: data.school || null,
-      subject: data.subject || null,
-      grade: data.grade || null,
-    })
-    .eq('id', authData.user.id);
-
-  if (updateError) {
-    console.error('Profile update error:', updateError);
+  // Supabase returns a user with empty identities when email already exists
+  // (instead of an error) when email confirmation is enabled
+  const identities = (authData.user as any).identities;
+  if (identities && Array.isArray(identities) && identities.length === 0) {
+    throw new Error('Bu e-posta adresi zaten kullanımda.');
   }
 
-  // Fetch updated profile
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', authData.user.id)
-    .single();
+  // Wait briefly for the database trigger to create the profile
+  await new Promise((r) => setTimeout(r, 1000));
 
-  if (profileError) {
-    throw new Error('Profil bilgileri alınamadı');
+  // Update profile with additional data (retry up to 3 times for trigger timing)
+  let retries = 3;
+  while (retries > 0) {
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({
+        school: data.school || null,
+        subject: data.subject || null,
+        grade: data.grade || null,
+      })
+      .eq('id', authData.user.id);
+
+    if (!updateError) break;
+    retries--;
+    if (retries > 0) {
+      await new Promise((r) => setTimeout(r, 500));
+    } else {
+      console.error('Profile update error after retries:', updateError);
+    }
+  }
+
+  // Fetch updated profile (retry for trigger timing)
+  let profile = null;
+  let profileRetries = 3;
+  while (profileRetries > 0) {
+    const { data: p, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', authData.user.id)
+      .single();
+
+    if (!profileError && p) {
+      profile = p;
+      break;
+    }
+    profileRetries--;
+    if (profileRetries > 0) {
+      await new Promise((r) => setTimeout(r, 500));
+    }
+  }
+
+  if (!profile) {
+    throw new Error('Profil oluşturulamadı. Lütfen tekrar giriş yapın.');
   }
 
   return mapProfileToUser(profile);

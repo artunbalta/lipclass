@@ -720,6 +720,52 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Step: Generate short demo narration text (for landing page demo)
+    if (step === 'demo_content') {
+      const { demoTopic, demoSubject } = body;
+      if (!demoTopic || !demoSubject) {
+        return NextResponse.json(
+          { error: 'demoTopic and demoSubject are required' },
+          { status: 400 }
+        );
+      }
+
+      const lang = language || 'tr';
+      const demoPrompt = lang === 'tr'
+        ? `Sen harika bir öğretmensin. Aşağıdaki konu hakkında çok kısa, etkileyici ve anlaşılır bir video ders metni hazırla.
+Konu: ${demoTopic}
+Ders: ${demoSubject}
+
+Kurallar:
+1. Sadece anlatılacak metni yaz. Başlık, giriş, "Merhaba arkadaşlar" gibi girişleri veya "Görüşürüz" gibi kapanışları ekleme.
+2. Maksimum 2-3 cümle olsun. Çok kısa ve öz olsun.
+3. Doğrudan konuya gir.
+4. Samimi ve enerjik bir dil kullan.
+5. Türkçe yaz.
+6. Sadece düz metin döndür, JSON formatı KULLANMA.`
+        : `You are a great teacher. Write a very short, impactful, and clear video lesson text on the following topic.
+Topic: ${demoTopic}
+Subject: ${demoSubject}
+
+Rules:
+1. Write only the narration text. No titles, intros like "Hello everyone", or closings like "Goodbye".
+2. Maximum 2-3 sentences. Very short and concise.
+3. Get straight to the point.
+4. Use a warm and energetic tone.
+5. Return only plain text, do NOT use JSON format.`;
+
+      const response = await falRequest<{ output: string }>('fal-ai/any-llm', {
+        prompt: demoPrompt,
+        model: 'google/gemini-2.5-flash-lite',
+        max_tokens: 500,
+        temperature: 0.7,
+      });
+
+      const text = response.output?.trim() || '';
+
+      return NextResponse.json({ text, stage: 'demo_content_complete' });
+    }
+
     // Step: Bunny Stream batch ingestion — upload each slide's lipsync video to Bunny
     if (step === 'bunny_ingest_batch') {
       if (!isBunnyEnabled()) {
@@ -748,7 +794,6 @@ export async function POST(request: NextRequest) {
       }> = [];
 
       for (const slide of slides) {
-        // Only ingest slides that have a video URL (lipsync output)
         if (!slide.videoUrl) {
           results.push({
             slideNumber: slide.slideNumber,
@@ -799,7 +844,7 @@ export async function POST(request: NextRequest) {
 
     // Unknown step
     return NextResponse.json(
-      { error: `Unknown step: ${step}. Use 'slides', 'tts_slide', 'tts_batch', 'lipsync', or 'bunny_ingest_batch'.` },
+      { error: `Unknown step: ${step}. Use 'slides', 'tts_slide', 'tts_batch', 'lipsync', 'demo_content', or 'bunny_ingest_batch'.` },
       { status: 400 }
     );
   } catch (error) {
