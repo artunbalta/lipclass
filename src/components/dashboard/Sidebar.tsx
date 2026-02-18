@@ -18,6 +18,7 @@ import {
   BookOpen,
   Bookmark,
   Search,
+  ClipboardList,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Logo } from '@/components/shared/Logo';
@@ -50,6 +51,7 @@ export function Sidebar({ role }: SidebarProps) {
     { icon: Video, label: t('sidebar.myVideos'), href: '/dashboard/teacher/videos' },
     { icon: Plus, label: t('sidebar.newVideo'), href: '/dashboard/teacher/create' },
     { icon: UserCircle, label: t('sidebar.referenceVideo'), href: '/dashboard/teacher/reference' },
+    { icon: ClipboardList, label: t('sidebar.quizzes'), href: '/dashboard/teacher/quizzes' },
     { icon: BarChart3, label: t('sidebar.analytics'), href: '/dashboard/teacher/analytics' },
     { icon: Settings, label: t('sidebar.settings'), href: '/dashboard/teacher/settings' },
   ];
@@ -59,6 +61,7 @@ export function Sidebar({ role }: SidebarProps) {
     { icon: Search, label: t('sidebar.discover'), href: '/dashboard/student/browse' },
     { icon: BookOpen, label: t('sidebar.myCourses'), href: '/dashboard/student/courses' },
     { icon: Bookmark, label: t('sidebar.saved'), href: '/dashboard/student/saved' },
+    { icon: ClipboardList, label: t('sidebar.browseQuizzes'), href: '/dashboard/student/quizzes' },
     { icon: Settings, label: t('sidebar.settings'), href: '/dashboard/student/settings' },
   ];
 

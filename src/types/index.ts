@@ -146,3 +146,91 @@ export type Subject =
 
 // Grade Type
 export type Grade = '5' | '6' | '7' | '8' | '9' | '10' | '11' | '12';
+
+// MCQ / Quiz Types
+export interface MCQQuestion {
+  question: string;
+  options: string[];
+  correctAnswer: number;
+  explanation: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  topic: string;
+}
+
+export interface Quiz {
+  id: string;
+  teacherId: string;
+  teacherName?: string;
+  documentId?: string;
+  title: string;
+  description?: string;
+  subject: string;
+  grade: string;
+  topic?: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  questionType: 'theoretical' | 'mathematical' | 'mixed';
+  language: 'tr' | 'en';
+  numQuestions: number;
+  status: 'draft' | 'generating' | 'ready' | 'published' | 'failed';
+  summary?: string;
+  questionsData?: MCQQuestion[];
+  sourceType: 'document' | 'text' | 'upload';
+  sourceText?: string;
+  uploadedFilePath?: string;
+  uploadedFileName?: string;
+  errorMessage?: string;
+  createdAt: Date;
+  updatedAt?: Date;
+}
+
+export interface QuizAttempt {
+  id: string;
+  quizId: string;
+  studentId: string;
+  answers: QuizAnswer[];
+  score: number;
+  totalQuestions: number;
+  timeSpent?: number;
+  completedAt: Date;
+  createdAt: Date;
+}
+
+export interface QuizAnswer {
+  questionIndex: number;
+  selectedAnswer: number;
+  isCorrect: boolean;
+}
+
+export interface CreateQuizFormData {
+  title: string;
+  subject: string;
+  grade: string;
+  topic: string;
+  numQuestions: number;
+  difficulty: 'easy' | 'medium' | 'hard';
+  questionType: 'theoretical' | 'mathematical' | 'mixed';
+  language: 'tr' | 'en';
+  sourceType: 'document' | 'text' | 'upload';
+  documentId?: string;
+  sourceText?: string;
+}
+
+export type QuizGenerationStage =
+  | 'idle'
+  | 'uploading'
+  | 'extracting'
+  | 'ocr'
+  | 'summarizing'
+  | 'generating'
+  | 'deduplicating'
+  | 'enhancing'
+  | 'saving'
+  | 'completed'
+  | 'failed';
+
+export interface QuizGenerationProgress {
+  stage: QuizGenerationStage;
+  progress: number;
+  message?: string;
+  error?: string;
+}

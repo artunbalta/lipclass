@@ -30,6 +30,8 @@ export const translations = {
             saved: 'Kaydedilenler',
             logout: 'Çıkış Yap',
             createVideo: 'Yeni Video Oluştur',
+            quizzes: 'Quizler',
+            browseQuizzes: 'Quizleri Keşfet',
         },
         header: {
             notifications: 'Bildirimler',
@@ -154,6 +156,8 @@ export const translations = {
             saved: 'Saved',
             logout: 'Log Out',
             createVideo: 'Create New Video',
+            quizzes: 'Quizzes',
+            browseQuizzes: 'Browse Quizzes',
         },
         header: {
             notifications: 'Notifications',
