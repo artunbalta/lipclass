@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { Sidebar, DashboardHeader } from '@/components/dashboard';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
+import { LanguageProvider } from '@/components/providers/language-provider';
 
 export default function DashboardLayout({
   children,
@@ -16,7 +17,6 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const { isAuthenticated, user, isLoading } = useAuthStore();
   const [mounted, setMounted] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -53,10 +53,24 @@ export default function DashboardLayout({
   const role = user.role;
 
   return (
+    <LanguageProvider>
+      <DashboardContent role={role}>
+        {children}
+      </DashboardContent>
+    </LanguageProvider>
+  );
+}
+
+function DashboardContent({ role, children }: { role: string; children: React.ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  return (
     <div className="min-h-screen bg-background">
       {/* Sidebar - Desktop */}
       <div className="hidden lg:block">
-        <Sidebar role={role} />
+        <Sidebar role={role as 'teacher' | 'student'} />
       </div>
 
       {/* Mobile Sidebar Overlay */}
@@ -77,7 +91,7 @@ export default function DashboardLayout({
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               className="fixed left-0 top-0 bottom-0 z-50 lg:hidden"
             >
-              <Sidebar role={role} />
+              <Sidebar role={role as 'teacher' | 'student'} />
             </motion.div>
           </>
         )}
@@ -85,9 +99,9 @@ export default function DashboardLayout({
 
       {/* Main Content */}
       <div className="lg:pl-[280px] min-h-screen flex flex-col">
-        <DashboardHeader 
-          onMenuClick={() => setSidebarOpen(true)} 
-          showMenuButton 
+        <DashboardHeader
+          onMenuClick={() => setSidebarOpen(true)}
+          showMenuButton
         />
         <main className="flex-1 p-4 lg:p-6">
           <AnimatePresence mode="wait">

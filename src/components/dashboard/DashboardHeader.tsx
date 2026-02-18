@@ -25,6 +25,7 @@ import {
 import { useAuthStore } from '@/stores/auth-store';
 import { cn } from '@/lib/utils';
 import { useTheme } from 'next-themes';
+import { useLanguage } from '@/components/providers/language-provider';
 
 interface DashboardHeaderProps {
   onMenuClick?: () => void;
@@ -34,6 +35,7 @@ interface DashboardHeaderProps {
 export function DashboardHeader({ onMenuClick, showMenuButton = false }: DashboardHeaderProps) {
   const { user, logout } = useAuthStore();
   const { theme, setTheme } = useTheme();
+  const { t } = useLanguage();
   const [searchOpen, setSearchOpen] = useState(false);
 
   const toggleDarkMode = () => {
@@ -60,7 +62,7 @@ export function DashboardHeader({ onMenuClick, showMenuButton = false }: Dashboa
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Ara..."
+              placeholder={t('common.search')}
               className="w-64 pl-9 bg-muted/50 border-0 focus-visible:ring-1"
             />
           </div>
@@ -93,7 +95,7 @@ export function DashboardHeader({ onMenuClick, showMenuButton = false }: Dashboa
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-80">
-            <DropdownMenuLabel>Bildirimler</DropdownMenuLabel>
+            <DropdownMenuLabel>{t('header.notifications')}</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <div className="max-h-64 overflow-y-auto">
               <DropdownMenuItem className="flex flex-col items-start gap-1 cursor-pointer">
@@ -113,7 +115,7 @@ export function DashboardHeader({ onMenuClick, showMenuButton = false }: Dashboa
             </div>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-center text-primary cursor-pointer">
-              Tümünü gör
+              {t('common.viewAll')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -141,15 +143,15 @@ export function DashboardHeader({ onMenuClick, showMenuButton = false }: Dashboa
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Profil</DropdownMenuItem>
-            <DropdownMenuItem>Ayarlar</DropdownMenuItem>
-            <DropdownMenuItem>Yardım</DropdownMenuItem>
+            <DropdownMenuItem>{t('header.profile')}</DropdownMenuItem>
+            <DropdownMenuItem>{t('sidebar.settings')}</DropdownMenuItem>
+            <DropdownMenuItem>{t('header.help')}</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={handleLogout}
               className="text-destructive focus:text-destructive"
             >
-              Çıkış Yap
+              {t('sidebar.logout')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -166,7 +168,7 @@ export function DashboardHeader({ onMenuClick, showMenuButton = false }: Dashboa
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Video, konu veya öğretmen ara..."
+              placeholder={t('common.search')}
               className="pl-9"
               autoFocus
             />

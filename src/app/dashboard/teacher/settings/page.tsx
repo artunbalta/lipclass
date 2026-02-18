@@ -1,14 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  User, 
-  Mail, 
-  Building, 
-  BookOpen, 
-  Bell, 
-  Shield, 
+import {
+  User,
+  Bell,
+  Shield,
   Palette,
   Save,
   Camera,
@@ -18,38 +15,137 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuthStore } from '@/stores/auth-store';
 import { SUBJECTS } from '@/lib/mock-data';
+import * as authAPI from '@/lib/api/auth';
+import { showToast } from '@/lib/utils/toast';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/components/providers/language-provider';
 
 export default function TeacherSettingsPage() {
-  const { user } = useAuthStore();
+  const { user, updateUser } = useAuthStore();
+  const { t, language, setLanguage } = useLanguage();
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
+  // Controlled form state
+  const [name, setName] = useState(user?.name || '');
+  const [email, setEmail] = useState(user?.email || '');
+  const [school, setSchool] = useState(user?.school || '');
+  const [subject, setSubject] = useState(
+    (user as { subject?: string })?.subject || 'Matematik'
+  );
+  const [bio, setBio] = useState(
+    (user as { bio?: string })?.bio || ''
+  );
+
+  // Password state
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  // Notification preferences state
+  const [notifications, setNotifications] = useState({
+    video_ready: true,
+    video_views: true,
+    comments: true,
+    updates: true,
+    tips: false,
+  });
 
   const handleSave = async () => {
     setIsSaving(true);
-    // Simulate save
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setIsSaving(false);
+    try {
+      const success = await updateUser({
+        name,
+        school,
+        subject,
+        bio,
+      });
+      if (success) {
+        showToast.success(t('settings.messages.profileUpdated'), t('settings.messages.profileUpdateSuccess'));
+      } else {
+        showToast.error(t('settings.messages.profileUpdateError'), 'Please try again.');
+      }
+    } catch {
+      showToast.error(t('common.error'), t('settings.messages.profileUpdateError'));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handlePasswordChange = async () => {
+    if (newPassword !== confirmPassword) {
+      showToast.error(t('settings.messages.passwordMismatch'), t('settings.messages.passwordMismatch'));
+      return;
+    }
+    if (newPassword.length < 6) {
+      showToast.error(t('settings.messages.passwordLength'), t('settings.messages.passwordLength'));
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      await authAPI.updatePassword(newPassword);
+      showToast.success(t('settings.messages.passwordUpdated'), t('settings.messages.passwordUpdated'));
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error: any) {
+      showToast.error(t('settings.messages.passwordUpdateError'), error.message || 'Please try again.');
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      showToast.error(t('settings.messages.fileTooLarge'), 'Max 2MB.');
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    try {
+      const avatarUrl = await authAPI.uploadAvatar(user.id, file);
+      await updateUser({ avatar: avatarUrl } as any);
+      showToast.success(t('settings.messages.avatarUpdated'), t('settings.messages.avatarUpdated'));
+    } catch (error: any) {
+      showToast.error(t('settings.messages.avatarUploadError'), error.message || 'Error uploading file.');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
+  const handleLanguageChange = (newLang: string) => {
+    setLanguage(newLang as any);
+    showToast.success(t('settings.messages.languageUpdated'), newLang === 'tr' ? 'Dil Türkçe olarak ayarlandı.' : 'Language set to English.');
+  };
+
+  const toggleNotification = (id: string) => {
+    setNotifications(prev => ({ ...prev, [id]: !prev[id as keyof typeof prev] }));
   };
 
   const tabs = [
-    { id: 'profile', label: 'Profil', icon: User },
-    { id: 'notifications', label: 'Bildirimler', icon: Bell },
-    { id: 'security', label: 'Güvenlik', icon: Shield },
-    { id: 'appearance', label: 'Görünüm', icon: Palette },
+    { id: 'profile', label: t('settings.tabs.profile'), icon: User },
+    { id: 'notifications', label: t('settings.tabs.notifications'), icon: Bell },
+    { id: 'security', label: t('settings.tabs.security'), icon: Shield },
+    { id: 'appearance', label: t('settings.tabs.appearance'), icon: Palette },
   ];
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl lg:text-3xl font-bold">Ayarlar</h1>
+        <h1 className="text-2xl lg:text-3xl font-bold">{t('settings.title')}</h1>
         <p className="text-muted-foreground mt-1">
-          Hesap ve uygulama ayarlarınızı yönetin
+          {t('settings.subtitle')}
         </p>
       </div>
 
@@ -80,7 +176,7 @@ export default function TeacherSettingsPage() {
         >
           {/* Avatar Section */}
           <div className="p-6 rounded-xl border border-border bg-card">
-            <h3 className="font-semibold mb-4">Profil Fotoğrafı</h3>
+            <h3 className="font-semibold mb-4">{t('settings.profile.photo')}</h3>
             <div className="flex items-center gap-6">
               <div className="relative">
                 <Avatar className="w-24 h-24 border-4 border-primary/20">
@@ -89,14 +185,36 @@ export default function TeacherSettingsPage() {
                     {user?.name?.split(' ').map(n => n[0]).join('')}
                   </AvatarFallback>
                 </Avatar>
-                <button className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg">
-                  <Camera className="w-4 h-4" />
+                <button
+                  className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploadingAvatar}
+                >
+                  {isUploadingAvatar ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Camera className="w-4 h-4" />
+                  )}
                 </button>
               </div>
               <div>
-                <Button variant="outline" size="sm">Fotoğraf Yükle</Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif"
+                  className="hidden"
+                  onChange={handleAvatarUpload}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploadingAvatar}
+                >
+                  {isUploadingAvatar ? t('settings.profile.uploading') : t('settings.profile.upload')}
+                </Button>
                 <p className="text-xs text-muted-foreground mt-2">
-                  JPG, PNG veya GIF. Maks. 2MB.
+                  {t('settings.profile.uploadHelp')}
                 </p>
               </div>
             </div>
@@ -104,39 +222,55 @@ export default function TeacherSettingsPage() {
 
           {/* Personal Info */}
           <div className="p-6 rounded-xl border border-border bg-card">
-            <h3 className="font-semibold mb-4">Kişisel Bilgiler</h3>
+            <h3 className="font-semibold mb-4">{t('settings.profile.personalInfo')}</h3>
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Ad Soyad</Label>
-                <Input id="name" defaultValue={user?.name} />
+                <Label htmlFor="name">{t('settings.profile.name')}</Label>
+                <Input
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">E-posta</Label>
-                <Input id="email" type="email" defaultValue={user?.email} />
+                <Label htmlFor="email">{t('settings.profile.email')}</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  disabled
+                  className="opacity-60"
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="school">Okul</Label>
-                <Input id="school" defaultValue={user?.school} />
+                <Label htmlFor="school">{t('settings.profile.school')}</Label>
+                <Input
+                  id="school"
+                  value={school}
+                  onChange={(e) => setSchool(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="subject">Branş</Label>
+                <Label htmlFor="subject">{t('settings.profile.subject')}</Label>
                 <select
                   id="subject"
                   className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
-                  defaultValue={(user as { subject?: string })?.subject}
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
                 >
-                  {SUBJECTS.map((subject) => (
-                    <option key={subject} value={subject}>{subject}</option>
+                  {SUBJECTS.map((s) => (
+                    <option key={s} value={s}>{s}</option>
                   ))}
                 </select>
               </div>
             </div>
             <div className="mt-4 space-y-2">
-              <Label htmlFor="bio">Hakkımda</Label>
+              <Label htmlFor="bio">{t('settings.profile.bio')}</Label>
               <Textarea
                 id="bio"
-                placeholder="Kendinizi kısaca tanıtın..."
-                defaultValue={(user as { bio?: string })?.bio}
+                placeholder={t('settings.profile.bioPlaceholder')}
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
                 rows={3}
               />
             </div>
@@ -148,12 +282,12 @@ export default function TeacherSettingsPage() {
               {isSaving ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Kaydediliyor...
+                  {t('common.saving')}
                 </>
               ) : (
                 <>
                   <Save className="w-4 h-4" />
-                  Değişiklikleri Kaydet
+                  {t('settings.profile.saveButton')}
                 </>
               )}
             </Button>
@@ -169,14 +303,14 @@ export default function TeacherSettingsPage() {
           className="space-y-6"
         >
           <div className="p-6 rounded-xl border border-border bg-card">
-            <h3 className="font-semibold mb-4">Bildirim Tercihleri</h3>
+            <h3 className="font-semibold mb-4">{t('settings.notifications.title')}</h3>
             <div className="space-y-4">
               {[
-                { id: 'video_ready', label: 'Video hazır olduğunda', desc: 'Video oluşturma tamamlandığında bildirim al' },
-                { id: 'video_views', label: 'Video izlendiğinde', desc: 'Videolarınız izlendiğinde haftalık özet al' },
-                { id: 'comments', label: 'Yeni yorum', desc: 'Videolarınıza yorum yapıldığında bildirim al' },
-                { id: 'updates', label: 'Ürün güncellemeleri', desc: 'Yeni özellikler ve güncellemeler hakkında bilgi al' },
-                { id: 'tips', label: 'İpuçları ve öneriler', desc: 'Platformu daha verimli kullanmak için öneriler al' },
+                { id: 'video_ready', label: t('settings.notifications.videoReady'), desc: t('settings.notifications.videoReadyDesc') },
+                { id: 'video_views', label: t('settings.notifications.videoViews'), desc: t('settings.notifications.videoViewsDesc') },
+                { id: 'comments', label: t('settings.notifications.comments'), desc: t('settings.notifications.commentsDesc') },
+                { id: 'updates', label: t('settings.notifications.updates'), desc: t('settings.notifications.updatesDesc') },
+                { id: 'tips', label: t('settings.notifications.tips'), desc: t('settings.notifications.tipsDesc') },
               ].map((item) => (
                 <div key={item.id} className="flex items-center justify-between py-3 border-b border-border last:border-0">
                   <div>
@@ -185,7 +319,8 @@ export default function TeacherSettingsPage() {
                   </div>
                   <input
                     type="checkbox"
-                    defaultChecked={item.id !== 'tips'}
+                    checked={notifications[item.id as keyof typeof notifications]}
+                    onChange={() => toggleNotification(item.id)}
                     className="w-5 h-5 rounded border-input text-primary focus:ring-primary"
                   />
                 </div>
@@ -203,30 +338,57 @@ export default function TeacherSettingsPage() {
           className="space-y-6"
         >
           <div className="p-6 rounded-xl border border-border bg-card">
-            <h3 className="font-semibold mb-4">Şifre Değiştir</h3>
+            <h3 className="font-semibold mb-4">{t('settings.security.changePassword')}</h3>
             <div className="space-y-4 max-w-md">
               <div className="space-y-2">
-                <Label htmlFor="current">Mevcut Şifre</Label>
-                <Input id="current" type="password" />
+                <Label htmlFor="current">{t('settings.security.currentPassword')}</Label>
+                <Input
+                  id="current"
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="new">Yeni Şifre</Label>
-                <Input id="new" type="password" />
+                <Label htmlFor="new">{t('settings.security.newPassword')}</Label>
+                <Input
+                  id="new"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="confirm">Yeni Şifre (Tekrar)</Label>
-                <Input id="confirm" type="password" />
+                <Label htmlFor="confirm">{t('settings.security.confirmPassword')}</Label>
+                <Input
+                  id="confirm"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
               </div>
-              <Button>Şifreyi Güncelle</Button>
+              <Button
+                onClick={handlePasswordChange}
+                disabled={isChangingPassword || !newPassword || !confirmPassword}
+              >
+                {isChangingPassword ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    {t('common.saving')}
+                  </>
+                ) : (
+                  t('settings.security.updateButton')
+                )}
+              </Button>
             </div>
           </div>
 
           <div className="p-6 rounded-xl border border-destructive/30 bg-destructive/5">
-            <h3 className="font-semibold mb-2 text-destructive">Hesabı Sil</h3>
+            <h3 className="font-semibold mb-2 text-destructive">{t('settings.security.deleteAccount')}</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Hesabınızı sildiğinizde tüm verileriniz kalıcı olarak silinir. Bu işlem geri alınamaz.
+              {t('settings.security.deleteWarning')}
             </p>
-            <Button variant="destructive">Hesabımı Sil</Button>
+            <Button variant="destructive">{t('settings.security.deleteButton')}</Button>
           </div>
         </motion.div>
       )}
@@ -238,22 +400,15 @@ export default function TeacherSettingsPage() {
           animate={{ opacity: 1, y: 0 }}
           className="space-y-6"
         >
-          <div className="p-6 rounded-xl border border-border bg-card">
-            <h3 className="font-semibold mb-4">Tema</h3>
-            <div className="flex items-center gap-4">
-              <div className="p-4 rounded-xl border-2 border-primary bg-primary/5 text-center">
-                <div className="w-full h-12 rounded-lg mb-2 bg-white border" />
-                <span className="text-sm font-medium">Açık</span>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Uygulama yalnızca açık tema modunda çalışmaktadır.
-              </p>
-            </div>
-          </div>
+
 
           <div className="p-6 rounded-xl border border-border bg-card">
-            <h3 className="font-semibold mb-4">Dil</h3>
-            <select className="w-full max-w-xs h-10 px-3 rounded-md border border-input bg-background text-sm">
+            <h3 className="font-semibold mb-4">{t('settings.appearance.language')}</h3>
+            <select
+              className="w-full max-w-xs h-10 px-3 rounded-md border border-input bg-background text-sm"
+              value={language}
+              onChange={(e) => handleLanguageChange(e.target.value)}
+            >
               <option value="tr">🇹🇷 Türkçe</option>
               <option value="en">🇬🇧 English</option>
             </select>

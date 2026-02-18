@@ -10,11 +10,12 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
-  
+
   // Actions
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   signup: (data: SignupData) => Promise<boolean>;
+  updateUser: (updates: Partial<Teacher | Student>) => Promise<boolean>;
   clearError: () => void;
 }
 
@@ -30,7 +31,7 @@ interface SignupData {
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       isAuthenticated: false,
       isLoading: false,
@@ -85,6 +86,20 @@ export const useAuthStore = create<AuthState>()(
             error: error.message || 'Kayıt başarısız',
             isLoading: false,
           });
+          return false;
+        }
+      },
+
+      updateUser: async (updates: Partial<Teacher | Student>) => {
+        const { user } = get();
+        if (!user) return false;
+
+        try {
+          const updatedUser = await authAPI.updateProfile(user.id, updates);
+          set({ user: updatedUser as User });
+          return true;
+        } catch (error: any) {
+          set({ error: error.message || 'Güncelleme başarısız' });
           return false;
         }
       },

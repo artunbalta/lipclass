@@ -24,33 +24,18 @@ import { Logo } from '@/components/shared/Logo';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/stores/auth-store';
+import { useLanguage } from '@/components/providers/language-provider';
 
 interface SidebarProps {
   role: 'teacher' | 'student';
 }
-
-const teacherNavItems = [
-  { icon: Home, label: 'Ana Sayfa', href: '/dashboard/teacher' },
-  { icon: Video, label: 'Videolarım', href: '/dashboard/teacher/videos' },
-  { icon: Plus, label: 'Yeni Video', href: '/dashboard/teacher/create' },
-  { icon: UserCircle, label: 'Referans Video', href: '/dashboard/teacher/reference' },
-  { icon: BarChart3, label: 'İstatistikler', href: '/dashboard/teacher/analytics' },
-  { icon: Settings, label: 'Ayarlar', href: '/dashboard/teacher/settings' },
-];
-
-const studentNavItems = [
-  { icon: Home, label: 'Ana Sayfa', href: '/dashboard/student' },
-  { icon: Search, label: 'Keşfet', href: '/dashboard/student/browse' },
-  { icon: BookOpen, label: 'Derslerim', href: '/dashboard/student/courses' },
-  { icon: Bookmark, label: 'Kaydedilenler', href: '/dashboard/student/saved' },
-  { icon: Settings, label: 'Ayarlar', href: '/dashboard/student/settings' },
-];
 
 export function Sidebar({ role }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
   const { user, logout } = useAuthStore();
   const { theme, resolvedTheme } = useTheme();
+  const { t } = useLanguage();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -59,6 +44,23 @@ export function Sidebar({ role }: SidebarProps) {
 
   // Default to light theme (dark logo) until mounted to prevent hydration mismatch
   const currentTheme = mounted ? resolvedTheme : 'light';
+
+  const teacherNavItems = [
+    { icon: Home, label: t('sidebar.home'), href: '/dashboard/teacher' },
+    { icon: Video, label: t('sidebar.myVideos'), href: '/dashboard/teacher/videos' },
+    { icon: Plus, label: t('sidebar.newVideo'), href: '/dashboard/teacher/create' },
+    { icon: UserCircle, label: t('sidebar.referenceVideo'), href: '/dashboard/teacher/reference' },
+    { icon: BarChart3, label: t('sidebar.analytics'), href: '/dashboard/teacher/analytics' },
+    { icon: Settings, label: t('sidebar.settings'), href: '/dashboard/teacher/settings' },
+  ];
+
+  const studentNavItems = [
+    { icon: Home, label: t('sidebar.home'), href: '/dashboard/student' },
+    { icon: Search, label: t('sidebar.discover'), href: '/dashboard/student/browse' },
+    { icon: BookOpen, label: t('sidebar.myCourses'), href: '/dashboard/student/courses' },
+    { icon: Bookmark, label: t('sidebar.saved'), href: '/dashboard/student/saved' },
+    { icon: Settings, label: t('sidebar.settings'), href: '/dashboard/student/settings' },
+  ];
 
   const navItems = role === 'teacher' ? teacherNavItems : studentNavItems;
 
@@ -149,7 +151,7 @@ export function Sidebar({ role }: SidebarProps) {
             <Link href="/dashboard/teacher/create">
               <Button className="w-full gap-2" size="sm">
                 <Plus className="w-4 h-4" />
-                Yeni Video Oluştur
+                {t('sidebar.createVideo')}
               </Button>
             </Link>
           </div>
@@ -201,9 +203,10 @@ export function Sidebar({ role }: SidebarProps) {
           )}
         >
           <LogOut className="w-4 h-4" />
-          {!collapsed && <span className="ml-2">Çıkış Yap</span>}
+          {!collapsed && <span className="ml-2">{t('sidebar.logout')}</span>}
         </Button>
       </div>
     </motion.aside>
   );
 }
+
