@@ -226,7 +226,7 @@ export async function generateVideo(options: GenerationOptions): Promise<SlidesD
 
     const slidesData: SlidesData = { slides: slidesWithAudio };
 
-    // ━━━ Stage 4: Bunny Stream Ingestion (93-97%) — only if enabled ━━━
+    // ━━━ Stage 4: Bunny Stream Ingestion (93-97%), only if enabled ━━━
     let videoProvider: 'fal' | 'bunny' = 'fal';
     let bunnyIngestionStatus: 'pending' | 'success' | 'failed' | null = null;
 
@@ -275,13 +275,13 @@ export async function generateVideo(options: GenerationOptions): Promise<SlidesD
           console.warn('[Generation] Bunny ingestion: all slides failed');
         }
       } else {
-        // Bunny not enabled or request failed — this is fine, fall back to fal
+        // Bunny not enabled or request failed, this is fine, fall back to fal
         const errBody = await bunnyCheckResponse.json().catch(() => ({}));
         console.log(`[Generation] Bunny ingestion skipped: ${errBody?.error || bunnyCheckResponse.statusText}`);
       }
     } catch (bunnyError) {
       console.warn('[Generation] Bunny ingestion error (non-fatal):', bunnyError);
-      // Non-fatal — video still works via fal URLs
+      // Non-fatal, video still works via fal URLs
     }
 
     onProgress?.({ stage: 'saving', progress: 97 });

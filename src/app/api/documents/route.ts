@@ -3,9 +3,9 @@ import { createClient } from '@supabase/supabase-js';
 
 /**
  * Document management API
- * POST   – Upload a document to Supabase Storage + create DB record
- * GET    – List teacher's documents
- * DELETE – Remove document (Storage + DB)
+ * POST,   Upload a document to Supabase Storage + create DB record
+ * GET,    List teacher's documents
+ * DELETE, Remove document (Storage + DB)
  */
 
 function getSupabaseAdmin() {

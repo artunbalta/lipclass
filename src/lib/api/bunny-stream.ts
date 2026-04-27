@@ -80,7 +80,7 @@ async function bunnyRequest<T>(
 
 /**
  * Create a new video entry in Bunny Stream.
- * This reserves a GUID — the actual video bytes are uploaded separately.
+ * This reserves a GUID, the actual video bytes are uploaded separately.
  */
 export async function createVideo(title: string): Promise<{ guid: string; libraryId: string }> {
     const config = getBunnyConfig();

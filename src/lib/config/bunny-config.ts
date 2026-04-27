@@ -1,5 +1,5 @@
 // Bunny Stream configuration
-// All secrets read from environment variables — never hardcoded.
+// All secrets read from environment variables, never hardcoded.
 
 export interface BunnyConfig {
     libraryId: string;

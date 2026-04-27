@@ -766,7 +766,7 @@ Rules:
       return NextResponse.json({ text, stage: 'demo_content_complete' });
     }
 
-    // Step: Bunny Stream batch ingestion — upload each slide's lipsync video to Bunny
+    // Step: Bunny Stream batch ingestion, upload each slide's lipsync video to Bunny
     if (step === 'bunny_ingest_batch') {
       if (!isBunnyEnabled()) {
         return NextResponse.json(

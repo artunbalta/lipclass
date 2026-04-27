@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
+import { SmoothScroll } from "@/components/providers/smooth-scroll";
 import LiquidEther from "@/components/ui/LiquidEther";
 import "katex/dist/katex.min.css";
 import "./globals.css";
@@ -63,7 +64,7 @@ export default function RootLayout({
           <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: -1, pointerEvents: 'none' }}>
             <LiquidEther />
           </div>
-          {children}
+          <SmoothScroll>{children}</SmoothScroll>
           <Toaster position="top-right" />
         </ThemeProvider>
       </body>

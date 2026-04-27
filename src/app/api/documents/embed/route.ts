@@ -4,7 +4,7 @@ import { embedDocument, isRagConfigured } from '@/lib/api/rag';
 
 /**
  * Embedding API
- * POST – Parse a document, create embeddings, store in Pinecone
+ * POST, Parse a document, create embeddings, store in Pinecone
  */
 
 function getSupabaseAdmin() {
