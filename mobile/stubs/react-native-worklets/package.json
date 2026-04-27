@@ -1,0 +1,6 @@
+{
+  "name": "react-native-worklets",
+  "version": "0.1.0",
+  "description": "No-op stub — react-native-worklets/plugin is only used by Reanimated 4+. We are on Reanimated 3.",
+  "main": "index.js"
+}

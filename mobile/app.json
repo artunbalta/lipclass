@@ -1,0 +1,74 @@
+{
+  "expo": {
+    "name": "Chalk AI",
+    "slug": "chalk-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/chalk-icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "scheme": "chalk",
+    "splash": {
+      "backgroundColor": "#0f0f0f",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.chalkais.mobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Referans video kaydı için kamera erişimi gereklidir.",
+        "NSMicrophoneUsageDescription": "Video kaydı için mikrofon erişimi gereklidir.",
+        "NSPhotoLibraryUsageDescription": "Referans video yüklemek için galeri erişimi gereklidir.",
+        "NSPhotoLibraryAddUsageDescription": "Kaydedilen videoları galeriye eklemek için izin gereklidir."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/chalk-icon.png",
+        "backgroundColor": "#0f0f0f"
+      },
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_MEDIA_VIDEO",
+        "READ_MEDIA_IMAGES"
+      ],
+      "package": "com.chalkais.mobile"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/chalk-icon.png",
+          "color": "#6366f1"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Referans video kaydı için kamera erişimi gereklidir.",
+          "microphonePermission": "Video kaydı için mikrofon erişimi gereklidir.",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Referans video yüklemek için galeri erişimi gereklidir.",
+          "cameraPermission": "Video çekmek için kamera erişimi gereklidir."
+        }
+      ],
+      "expo-video"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

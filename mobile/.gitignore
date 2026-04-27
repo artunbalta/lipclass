@@ -1,0 +1,15 @@
+node_modules/
+.expo/
+dist/
+web-build/
+
+# Local env — never commit real secrets
+.env
+.env.local
+
+# OS
+.DS_Store
+*.log
+
+# Expo generated
+expo-env.d.ts
