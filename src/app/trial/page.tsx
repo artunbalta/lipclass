@@ -6,6 +6,8 @@ import dynamic from "next/dynamic";
 import { useRef } from "react";
 import Link from "next/link";
 import { ChalkHero } from "@/components/ui/chalk-hero";
+import { ComputerMockup } from "@/components/ui/computer-mockup";
+import { Logos3 } from "@/components/ui/logos3";
 
 const PaperShadersBackground = dynamic(
   () =>
@@ -103,7 +105,7 @@ export default function TrialPage() {
 
         <div className="relative z-10">
       {/* ── How it works ── */}
-      <section className="px-4 py-24 sm:px-6 md:px-10 lg:py-32">
+      <section id="how-it-works" className="scroll-mt-24 px-4 py-24 sm:px-6 md:px-10 lg:py-32">
         <div className="mx-auto max-w-6xl">
           <FadeIn className="mb-16 text-center">
             <span className="mb-4 inline-block rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-white/50">
@@ -133,6 +135,18 @@ export default function TrialPage() {
               </FadeIn>
             ))}
           </div>
+
+          {/* ── Demo video (computer mockup) ── */}
+          <div className="mt-20 lg:mt-24">
+            <FadeIn>
+              <ComputerMockup />
+            </FadeIn>
+            <FadeIn delay={0.15} className="mt-6 text-center">
+              <p className="text-xs uppercase tracking-widest text-white/35">
+                Chalk panelinden canlı görünüm
+              </p>
+            </FadeIn>
+          </div>
         </div>
       </section>
 
@@ -141,8 +155,30 @@ export default function TrialPage() {
         <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
       </div>
 
+      {/* ── Trusted by (school logos) ── */}
+      <FadeIn>
+        <Logos3
+          heading="Türkiye'nin önde gelen okullarında deneniyor"
+          logos={[
+            { id: "school-1", description: "Pilot Okul 1", image: "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/logos/astro-wordmark.svg", className: "h-7 w-auto opacity-60" },
+            { id: "school-2", description: "Pilot Okul 2", image: "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/logos/figma-wordmark.svg", className: "h-7 w-auto opacity-60" },
+            { id: "school-3", description: "Pilot Okul 3", image: "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/logos/nextjs-wordmark.svg", className: "h-7 w-auto opacity-60" },
+            { id: "school-4", description: "Pilot Okul 4", image: "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/logos/react-wordmark.svg", className: "h-7 w-auto opacity-60" },
+            { id: "school-5", description: "Pilot Okul 5", image: "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/logos/shadcn-ui-wordmark.svg", className: "h-7 w-auto opacity-60" },
+            { id: "school-6", description: "Pilot Okul 6", image: "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/logos/supabase-wordmark.svg", className: "h-7 w-auto opacity-60" },
+            { id: "school-7", description: "Pilot Okul 7", image: "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/logos/tailwind-wordmark.svg", className: "h-4 w-auto opacity-60" },
+            { id: "school-8", description: "Pilot Okul 8", image: "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/logos/vercel-wordmark.svg", className: "h-7 w-auto opacity-60" },
+          ]}
+        />
+      </FadeIn>
+
+      {/* ── Divider ── */}
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 md:px-10">
+        <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+      </div>
+
       {/* ── Features ── */}
-      <section className="px-4 py-24 sm:px-6 md:px-10 lg:py-32">
+      <section id="features" className="scroll-mt-24 px-4 py-24 sm:px-6 md:px-10 lg:py-32">
         <div className="mx-auto max-w-6xl">
           <FadeIn className="mb-16 text-center">
             <h2 className="text-4xl font-bold tracking-tight text-[#E1E0CC] sm:text-5xl">
