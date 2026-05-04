@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // generate-video route can run for up to 5 minutes (lipsync + Manim rendering)
+  serverExternalPackages: [],
   images: {
     dangerouslyAllowSVG: true,
     contentDispositionType: 'attachment',

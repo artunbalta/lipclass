@@ -1,0 +1,3 @@
+modal>=0.73.0
+# httpx and the rest of the runtime ship inside manimcommunity/manim:stable
+# Do NOT add supabase — it pulls in pyiceberg which needs gcc (not in the Manim image)

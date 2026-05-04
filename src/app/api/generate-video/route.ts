@@ -3,6 +3,9 @@ import { retrieveContext, isRagConfigured } from '@/lib/api/rag';
 import { isBunnyEnabled } from '@/lib/config/bunny-config';
 import { ingestFromUrl } from '@/lib/api/bunny-stream';
 
+// Allow up to 5 minutes — needed for lipsync polling and Manim render calls
+export const maxDuration = 300;
+
 // Fal AI API endpoints
 const FAL_API_BASE = 'https://fal.run';
 const FAL_QUEUE_BASE = 'https://queue.fal.run';
@@ -573,6 +576,293 @@ async function createLipsyncVideo(
   throw new Error(`Lipsync timed out after ${maxWaitMs / 1000}s`);
 }
 
+// ---------------------------------------------------------------------------
+// Manim helpers
+// ---------------------------------------------------------------------------
+
+const MANIM_SYSTEM_PROMPT = `You are a Manim animation expert creating short educational animations for high-school and university students.
+
+Given a lecture slide, choose the animation style that best visualises the core idea — formulas, diagrams, graphs, force sketches, geometric constructions, etc.
+
+STRICT OUTPUT RULES:
+1. Output ONLY valid Python code — no markdown fences, no explanation.
+2. The class MUST be named exactly \`SlideScene\`.
+3. Always start with: from manim import *
+4. Output exactly the word SKIP (nothing else) for:
+   - Pure intro / welcome slides (slide 1) with no formulas or diagrams
+   - Pure summary slides that only list bullet text
+   - Slides whose entire content is already plain prose with nothing to visualise
+5. Animation total duration: 10–20 seconds. Use self.wait() for pacing.
+6. LaTeX inside MathTex: escape backslashes once — \\\\frac, \\\\sqrt, \\\\vec, \\\\cdot, \\\\Delta, etc.
+   Do NOT use $ delimiters inside MathTex().
+7. Animate the 1–3 most important ideas. Do not try to show everything.
+
+COLOR CONVENTIONS:
+  WHITE   — body text, labels
+  YELLOW  — formulas, equations, key values
+  BLUE    — axes, reference lines, water/electricity
+  GREEN   — results, final answers, positive forces
+  RED     — warnings, opposing forces, negative
+  ORANGE  — objects (blocks, balls, particles)
+
+━━━ ANIMATION TYPE SELECTION ━━━
+
+Read the slide content and pick ONE primary type:
+
+TYPE A — FORMULA DERIVATION
+  When: slide is dominated by equations, proofs, algebraic manipulation.
+  How: Write each MathTex step top-to-bottom, use Transform to evolve expressions.
+
+TYPE B — FUNCTION / GRAPH
+  When: slide discusses a function, curve, distribution, or numeric relationship.
+  How: Axes() + axes.plot(lambda x: ...) + get_graph_label(). Animate with Create().
+
+TYPE C — PHYSICS / FORCE DIAGRAM
+  When: slide mentions forces, vectors, motion, fields, circuits, torque, pressure.
+  How: Draw the physical object (Rectangle/Circle/Dot), then GrowArrow() for each
+  force/vector with a MathTex label. Add ground lines, walls, springs with Line().
+  Animate forces appearing one by one with narration-friendly pacing.
+
+TYPE D — GEOMETRIC CONSTRUCTION
+  When: slide covers geometry, angles, area, proofs, trigonometry, coordinate geometry.
+  How: Draw shapes (Polygon, Circle, Line), animate angle arcs with Arc(),
+  label sides/angles with MathTex, use Indicate() or Circumscribe() to highlight.
+
+TYPE E — CONCEPT / PROCESS DIAGRAM
+  When: slide explains a process, cycle, relationship between concepts, algorithm steps.
+  How: Use labeled boxes (RoundedRectangle + Text), connect them with Arrow(),
+  animate boxes and arrows appearing sequentially.
+
+TYPE F — STEP-BY-STEP PROBLEM SOLUTION
+  When: slide shows a worked example with numbered steps.
+  How: Each step is a MathTex or Text line appearing with FadeIn(shift=DOWN*0.3).
+
+━━━ EXAMPLES ━━━
+
+EXAMPLE A — formula derivation (kinetic energy):
+from manim import *
+
+class SlideScene(Scene):
+    def construct(self):
+        title = Text("Kinetic Energy", font_size=36, color=WHITE).to_edge(UP)
+        self.play(Write(title))
+
+        step1 = MathTex(r"W = F \\cdot d", font_size=52, color=YELLOW)
+        self.play(Write(step1))
+        self.wait(0.8)
+
+        step2 = MathTex(r"W = ma \\cdot d = m \\cdot \\frac{v^2}{2}", font_size=52, color=YELLOW)
+        self.play(TransformMatchingTex(step1, step2))
+        self.wait(0.8)
+
+        step3 = MathTex(r"E_k = \\frac{1}{2}mv^2", font_size=64, color=GREEN)
+        self.play(TransformMatchingTex(step2, step3))
+        self.wait(2)
+
+EXAMPLE B — graph (quadratic):
+from manim import *
+
+class SlideScene(Scene):
+    def construct(self):
+        title = Text("Quadratic Function", font_size=36, color=WHITE).to_edge(UP)
+        self.play(Write(title))
+
+        axes = Axes(x_range=[-3, 3, 1], y_range=[-1, 5, 1],
+                    axis_config={"color": BLUE})
+        graph = axes.plot(lambda x: x**2, color=YELLOW)
+        label = axes.get_graph_label(graph, label=r"f(x)=x^2", color=YELLOW)
+
+        self.play(Create(axes))
+        self.play(Create(graph), Write(label))
+        self.wait(2)
+
+EXAMPLE C — physics diagram (Newton's second law, free body diagram):
+from manim import *
+
+class SlideScene(Scene):
+    def construct(self):
+        title = Text("Newton's Second Law", font_size=34, color=WHITE).to_edge(UP)
+        self.play(Write(title))
+
+        # Ground and block
+        ground = Line(LEFT * 3.5, RIGHT * 3.5, color=WHITE).shift(DOWN * 1.5)
+        block = Rectangle(width=1.2, height=1.2, color=ORANGE, fill_opacity=0.8)
+        block.move_to(ORIGIN)
+        self.play(Create(ground), FadeIn(block))
+
+        # Applied force (right)
+        f_arrow = Arrow(block.get_right(), block.get_right() + RIGHT * 2,
+                        color=GREEN, buff=0)
+        f_label = MathTex(r"F", color=GREEN, font_size=40).next_to(f_arrow, UP)
+        self.play(GrowArrow(f_arrow), Write(f_label))
+
+        # Friction (left)
+        fr_arrow = Arrow(block.get_left(), block.get_left() + LEFT * 1.2,
+                         color=RED, buff=0)
+        fr_label = MathTex(r"f", color=RED, font_size=40).next_to(fr_arrow, UP)
+        self.play(GrowArrow(fr_arrow), Write(fr_label))
+
+        # Weight (down) and Normal (up)
+        w_arrow = Arrow(block.get_center(), block.get_center() + DOWN * 1.4,
+                        color=YELLOW, buff=0)
+        w_label = MathTex(r"mg", color=YELLOW, font_size=36).next_to(w_arrow, RIGHT)
+        n_arrow = Arrow(block.get_bottom(), block.get_bottom() + UP * 1.4,
+                        color=BLUE, buff=0)
+        n_label = MathTex(r"N", color=BLUE, font_size=36).next_to(n_arrow, RIGHT)
+        self.play(GrowArrow(w_arrow), Write(w_label),
+                  GrowArrow(n_arrow), Write(n_label))
+
+        # Result formula
+        result = MathTex(r"F_{net} = ma", font_size=48, color=GREEN)
+        result.to_edge(DOWN, buff=0.4)
+        self.play(Write(result))
+        self.wait(2)
+
+EXAMPLE D — geometric construction (Pythagorean theorem):
+from manim import *
+
+class SlideScene(Scene):
+    def construct(self):
+        title = Text("Pythagorean Theorem", font_size=34, color=WHITE).to_edge(UP)
+        self.play(Write(title))
+
+        # Right triangle
+        A, B, C = LEFT * 2 + DOWN, LEFT * 2 + UP * 1.5, RIGHT * 1.5 + DOWN
+        triangle = Polygon(A, B, C, color=WHITE)
+        right_angle = RightAngle(Line(A, B), Line(A, C), length=0.25, color=WHITE)
+
+        a_label = MathTex(r"a", color=YELLOW).move_to(midpoint(A, B) + LEFT * 0.3)
+        b_label = MathTex(r"b", color=YELLOW).move_to(midpoint(A, C) + DOWN * 0.3)
+        c_label = MathTex(r"c", color=GREEN).move_to(midpoint(B, C) + RIGHT * 0.4)
+
+        self.play(Create(triangle), Create(right_angle))
+        self.play(Write(a_label), Write(b_label), Write(c_label))
+
+        formula = MathTex(r"a^2 + b^2 = c^2", font_size=56, color=GREEN)
+        formula.to_edge(DOWN, buff=0.6)
+        self.play(Write(formula))
+        self.wait(2)
+
+EXAMPLE E — concept diagram (photosynthesis steps):
+from manim import *
+
+class SlideScene(Scene):
+    def construct(self):
+        title = Text("Photosynthesis", font_size=34, color=WHITE).to_edge(UP)
+        self.play(Write(title))
+
+        boxes = VGroup()
+        labels = ["Light\\nAbsorption", "Water\\nSplitting", "CO₂\\nFixation", "Glucose"]
+        colors = [YELLOW, BLUE, GREEN, ORANGE]
+        for i, (lbl, col) in enumerate(zip(labels, colors)):
+            box = RoundedRectangle(width=2, height=1, corner_radius=0.2,
+                                   color=col, fill_opacity=0.25)
+            text = Text(lbl, font_size=22, color=col)
+            text.move_to(box)
+            boxes.add(VGroup(box, text))
+        boxes.arrange(RIGHT, buff=0.5).shift(DOWN * 0.3)
+
+        arrows = VGroup(*[
+            Arrow(boxes[i].get_right(), boxes[i+1].get_left(), buff=0.05, color=WHITE)
+            for i in range(len(boxes)-1)
+        ])
+
+        for box in boxes:
+            self.play(FadeIn(box, shift=UP * 0.2), run_time=0.5)
+        for arrow in arrows:
+            self.play(GrowArrow(arrow), run_time=0.4)
+        self.wait(2)
+`;
+
+/**
+ * Call the LLM to generate a Manim Python script for a given slide.
+ * Returns either valid Python code (starting with "from manim import *")
+ * or the string "SKIP" when the slide doesn't warrant animation.
+ */
+async function generateManimCode(
+  slide: { slideNumber: number; title: string; content: string; bulletPoints: string[] },
+  topic: string,
+  language: string
+): Promise<string> {
+  const userPrompt = `Topic: ${topic}
+Slide ${slide.slideNumber}/10: "${slide.title}"
+
+Content:
+${slide.content}
+
+Bullet points:
+${slide.bulletPoints.map((b, i) => `${i + 1}. ${b}`).join('\n')}
+
+Language hint: ${language === 'tr' ? 'Turkish content — use English labels in Manim (LaTeX renders in English regardless)' : 'English content'}
+
+Generate the Manim SlideScene now:`;
+
+  const response = await falRequest<{ output: string }>('fal-ai/any-llm', {
+    prompt: userPrompt,
+    system_prompt: MANIM_SYSTEM_PROMPT,
+    model: 'google/gemini-2.5-flash',
+    max_tokens: 3000,
+    temperature: 0.3, // low temp — we want consistent, correct code
+  });
+
+  const raw = (response.output || '').trim();
+
+  // Strip markdown code fences if LLM wrapped the output anyway
+  if (raw.includes('```')) {
+    const match = raw.match(/```(?:python)?\s*\n?([\s\S]*?)\n?```/);
+    if (match?.[1]) return match[1].trim();
+  }
+
+  return raw;
+}
+
+/**
+ * Send Manim code to the Modal endpoint for rendering.
+ * Returns the public Supabase Storage URL of the rendered MP4, or null on failure.
+ */
+async function renderManimAnimation(
+  manimCode: string,
+  slideNumber: number,
+  videoId: string
+): Promise<string | null> {
+  const modalUrl = process.env.MODAL_MANIM_URL;
+  if (!modalUrl) {
+    console.log('[Manim] MODAL_MANIM_URL not set — skipping animation render');
+    return null;
+  }
+
+  if (!manimCode || manimCode.trim().toUpperCase() === 'SKIP') {
+    return null;
+  }
+
+  try {
+    const res = await fetch(modalUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ manim_code: manimCode, slide_number: slideNumber, video_id: videoId }),
+      signal: AbortSignal.timeout(280_000), // 280s — just under Vercel's 300s function limit
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      console.error(`[Manim] Modal returned ${res.status}: ${text.slice(0, 200)}`);
+      return null;
+    }
+
+    const data = await res.json() as { animation_url?: string | null; skipped?: boolean; error?: string | null };
+
+    if (data.error) {
+      console.error(`[Manim] Render error for slide ${slideNumber}:`, data.error);
+      return null;
+    }
+
+    return data.animation_url ?? null;
+  } catch (err) {
+    console.error(`[Manim] fetch error for slide ${slideNumber}:`, err);
+    return null;
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -842,9 +1132,41 @@ Rules:
       });
     }
 
+    // Step: Generate Manim Python code for a single slide using the LLM
+    if (step === 'manim_code') {
+      const { slide, topic, language: lang = 'en' } = body as {
+        slide: { slideNumber: number; title: string; content: string; bulletPoints: string[] };
+        topic: string;
+        language?: string;
+      };
+
+      if (!slide || !topic) {
+        return NextResponse.json({ error: 'slide and topic are required' }, { status: 400 });
+      }
+
+      const manimCode = await generateManimCode(slide, topic, lang);
+      return NextResponse.json({ manim_code: manimCode });
+    }
+
+    // Step: Send Manim code to Modal for rendering, return animation_url
+    if (step === 'manim_render') {
+      const { manim_code, slide_number, video_id } = body as {
+        manim_code: string;
+        slide_number: number;
+        video_id: string;
+      };
+
+      if (!manim_code || !video_id) {
+        return NextResponse.json({ error: 'manim_code and video_id are required' }, { status: 400 });
+      }
+
+      const animationUrl = await renderManimAnimation(manim_code, slide_number, video_id);
+      return NextResponse.json({ animation_url: animationUrl });
+    }
+
     // Unknown step
     return NextResponse.json(
-      { error: `Unknown step: ${step}. Use 'slides', 'tts_slide', 'tts_batch', 'lipsync', 'demo_content', or 'bunny_ingest_batch'.` },
+      { error: `Unknown step: ${step}. Use 'slides', 'tts_slide', 'tts_batch', 'lipsync', 'demo_content', 'bunny_ingest_batch', 'manim_code', or 'manim_render'.` },
       { status: 400 }
     );
   } catch (error) {

@@ -161,9 +161,17 @@ export async function generateVideo(options: GenerationOptions): Promise<SlidesD
       };
     });
 
-    // ━━━ Stage 3: Lipsync for each slide (25-93%) ━━━
-    // Each slide gets its own lipsync video (reference video + TTS audio → synced lips)
-    if (referenceVideoUrl) {
+    // ━━━ Stage 3: Lipsync + Manim in parallel (25-93%) ━━━
+    // Lipsync: sequential per slide (reference video + audio → lip-synced video)
+    // Manim:   parallel across all slides (LLM generates code → Modal renders)
+    // Both run concurrently so total time ≈ max(lipsync_time, manim_time)
+
+    const runLipsync = async () => {
+      if (!referenceVideoUrl) {
+        console.log('[Generation] No reference video — skipping lipsync');
+        return;
+      }
+
       const slidesWithAudioCount = slidesWithAudio.filter((s) => s.audioUrl).length;
       let lipsyncDone = 0;
 
@@ -183,7 +191,6 @@ export async function generateVideo(options: GenerationOptions): Promise<SlidesD
 
         try {
           console.log(`[Lipsync] Starting slide ${slide.slideNumber}...`);
-
           const lipsyncResponse = await fetch('/api/generate-video', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -206,7 +213,7 @@ export async function generateVideo(options: GenerationOptions): Promise<SlidesD
           }
         } catch (err) {
           console.error(`[Lipsync] Slide ${slide.slideNumber} error:`, err);
-          // Continue - slide will fall back to reference video loop in player
+          // Non-fatal: slide falls back to reference video loop in the player
         }
 
         lipsyncDone++;
@@ -218,11 +225,84 @@ export async function generateVideo(options: GenerationOptions): Promise<SlidesD
         });
       }
 
-      const successCount = slidesWithAudio.filter((s) => s.videoUrl).length;
-      console.log(`[Generation] Lipsync completed: ${successCount}/${slidesWithAudioCount} slides`);
-    } else {
-      console.log('[Generation] No reference video - skipping lipsync');
-    }
+      const lipsyncSuccess = slidesWithAudio.filter((s) => s.videoUrl).length;
+      console.log(`[Generation] Lipsync completed: ${lipsyncSuccess}/${slidesWithAudioCount} slides`);
+    };
+
+    const runManimBatch = async () => {
+      console.log('[Manim] Starting parallel animation generation...');
+
+      // Generate code + render for every slide simultaneously
+      const manimTasks = slidesWithAudio.map(async (slide) => {
+        try {
+          // Step A: LLM generates Manim Python code
+          const codeResponse = await fetch('/api/generate-video', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              step: 'manim_code',
+              slide: {
+                slideNumber: slide.slideNumber,
+                title: slide.title,
+                content: slide.content,
+                bulletPoints: slide.bulletPoints,
+              },
+              topic,
+              language,
+            }),
+          });
+
+          if (!codeResponse.ok) {
+            console.warn(`[Manim] Code gen failed for slide ${slide.slideNumber}`);
+            return;
+          }
+
+          const { manim_code } = (await codeResponse.json()) as { manim_code: string };
+
+          if (!manim_code || manim_code.trim().toUpperCase() === 'SKIP') {
+            console.log(`[Manim] Slide ${slide.slideNumber} → SKIP`);
+            return;
+          }
+
+          console.log(`[Manim] Slide ${slide.slideNumber} code generated, sending to Modal...`);
+
+          // Step B: Modal renders the code → returns animation URL
+          const renderResponse = await fetch('/api/generate-video', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              step: 'manim_render',
+              manim_code,
+              slide_number: slide.slideNumber,
+              video_id: videoId,
+            }),
+          });
+
+          if (!renderResponse.ok) {
+            console.warn(`[Manim] Render failed for slide ${slide.slideNumber}`);
+            return;
+          }
+
+          const { animation_url } = (await renderResponse.json()) as { animation_url: string | null };
+
+          if (animation_url) {
+            slide.animationUrl = animation_url;
+            console.log(`[Manim] Slide ${slide.slideNumber} animation ready`);
+          }
+        } catch (err) {
+          // Non-fatal: slide falls back to static KaTeX
+          console.error(`[Manim] Slide ${slide.slideNumber} error:`, err);
+        }
+      });
+
+      await Promise.all(manimTasks);
+
+      const manimSuccess = slidesWithAudio.filter((s) => s.animationUrl).length;
+      console.log(`[Generation] Manim completed: ${manimSuccess}/${slidesWithAudio.length} slides animated`);
+    };
+
+    // Run lipsync and Manim concurrently
+    await Promise.all([runLipsync(), runManimBatch()]);
 
     const slidesData: SlidesData = { slides: slidesWithAudio };
 

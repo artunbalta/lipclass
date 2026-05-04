@@ -32,7 +32,8 @@ export interface Slide {
   bulletPoints: string[];
   narrationText: string; // What the teacher says for this slide (also used for lipsync)
   audioUrl?: string; // TTS audio URL for this slide
-  videoUrl?: string; // Per-slide lipsync video URL (future: generated from narrationText + reference video)
+  videoUrl?: string; // Per-slide lipsync video URL
+  animationUrl?: string; // Manim-generated animation video URL for this slide
   bunnyVideoGuid?: string; // Bunny Stream video GUID (when provider=bunny)
   bunnyEmbedUrl?: string; // Bunny Stream embed URL (when provider=bunny)
 }
