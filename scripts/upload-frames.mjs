@@ -1,27 +1,27 @@
-// One-shot migration: uploads every PNG/JPG/WebP in public/framesinteractive
-// to Vercel Blob under the same filename, preserving order.
+// Optimizes every PNG/JPG/WebP in public/framesinteractive (3448×2404 originals
+// are ~7 MB each = ~1 GB total — unusable from a CDN), then uploads them to
+// Vercel Blob as compact WebP under the same filename stem.
+//
+// After re-encoded WebPs are uploaded, the old .png blobs at the same prefix
+// are deleted so the API only returns one URL per frame.
 //
 // Prereqs:
-//   1. `vercel link`         — link the project
-//   2. `vercel env pull`     — writes BLOB_READ_WRITE_TOKEN into .env.local
+//   1. `vercel link`
+//   2. `vercel env pull`
 //   3. `npm run upload-frames`
 //
-// Re-running is safe (allowOverwrite: true).
+// Re-runnable (allowOverwrite: true).
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { put } from "@vercel/blob";
+import sharp from "sharp";
+import { put, list, del } from "@vercel/blob";
 
 const SRC_DIR = path.join(process.cwd(), "public", "framesinteractive");
 const PREFIX = "framesinteractive/";
-const CONCURRENCY = 8;
-
-const CONTENT_TYPES = {
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".webp": "image/webp",
-};
+const TARGET_WIDTH = 1600;
+const QUALITY = 80;
+const CONCURRENCY = 4;
 
 if (!process.env.BLOB_READ_WRITE_TOKEN) {
   console.error(
@@ -39,23 +39,39 @@ if (files.length === 0) {
   process.exit(1);
 }
 
-console.log(`Uploading ${files.length} frames to Vercel Blob…`);
+console.log(
+  `Optimizing ${files.length} frames → ${TARGET_WIDTH}px wide WebP @ Q${QUALITY}, then uploading…`,
+);
 
 let completed = 0;
 let failed = 0;
+let totalBytesIn = 0;
+let totalBytesOut = 0;
 
-async function uploadOne(file) {
-  const ext = path.extname(file).toLowerCase();
-  const buffer = await fs.readFile(path.join(SRC_DIR, file));
+async function processOne(file) {
+  const stem = file.replace(/\.[^.]+$/, "");
+  const input = path.join(SRC_DIR, file);
   try {
-    await put(`${PREFIX}${file}`, buffer, {
+    const stat = await fs.stat(input);
+    totalBytesIn += stat.size;
+
+    const buffer = await sharp(input)
+      .resize({ width: TARGET_WIDTH, withoutEnlargement: true })
+      .webp({ quality: QUALITY, effort: 5 })
+      .toBuffer();
+
+    totalBytesOut += buffer.length;
+
+    await put(`${PREFIX}${stem}.webp`, buffer, {
       access: "public",
       addRandomSuffix: false,
-      contentType: CONTENT_TYPES[ext] ?? "application/octet-stream",
+      contentType: "image/webp",
       allowOverwrite: true,
     });
     completed++;
-    process.stdout.write(`\r[${completed + failed}/${files.length}] ${file}`);
+    process.stdout.write(
+      `\r[${completed + failed}/${files.length}] ${file} → ${(buffer.length / 1024).toFixed(0)} KB    `,
+    );
   } catch (err) {
     failed++;
     console.error(`\n  ✗ ${file}: ${err.message}`);
@@ -64,8 +80,35 @@ async function uploadOne(file) {
 
 for (let i = 0; i < files.length; i += CONCURRENCY) {
   const chunk = files.slice(i, i + CONCURRENCY);
-  await Promise.all(chunk.map(uploadOne));
+  await Promise.all(chunk.map(processOne));
 }
 
-console.log(`\nDone. ${completed} uploaded, ${failed} failed.`);
+console.log(
+  `\nUpload done. ${completed} uploaded, ${failed} failed. ` +
+    `Source ${(totalBytesIn / 1024 / 1024).toFixed(1)} MB → Blob ${(totalBytesOut / 1024 / 1024).toFixed(1)} MB.`,
+);
+
+// Clean up old .png/.jpg blobs at the same prefix so the API only returns
+// the new .webp version of each frame.
+console.log("\nCleaning up old non-WebP blobs at the same prefix…");
+let cursor;
+const toDelete = [];
+do {
+  const page = await list({ prefix: PREFIX, cursor, limit: 1000 });
+  for (const blob of page.blobs) {
+    if (/\.(png|jpe?g)$/i.test(blob.pathname)) {
+      toDelete.push(blob.url);
+    }
+  }
+  cursor = page.cursor;
+} while (cursor);
+
+if (toDelete.length > 0) {
+  // del() accepts an array of URLs.
+  await del(toDelete);
+  console.log(`Deleted ${toDelete.length} old non-WebP blobs.`);
+} else {
+  console.log("No old blobs to delete.");
+}
+
 if (failed > 0) process.exit(1);

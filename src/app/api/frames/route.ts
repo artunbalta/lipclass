@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 
 const PREFIX = "framesinteractive/";
 
-export const revalidate = 3600;
+export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   const frames: { pathname: string; url: string }[] = [];
