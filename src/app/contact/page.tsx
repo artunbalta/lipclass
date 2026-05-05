@@ -8,7 +8,6 @@ import {
     Phone,
     MapPin,
     Send,
-    MessageSquare,
     Clock,
     Linkedin,
     Twitter,
@@ -16,7 +15,6 @@ import {
     CheckCircle2,
     Loader2
 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -96,29 +94,29 @@ export default function ContactPage() {
             <Navbar />
 
             {/* Hero Section */}
-            <section className="pt-32 pb-16 bg-gradient-to-b from-white to-slate-50 relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-[600px] h-[600px] bg-indigo-50/50 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2 pointer-events-none opacity-40" />
-                <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-purple-50/50 rounded-full blur-3xl translate-x-1/2 translate-y-1/2 pointer-events-none opacity-40" />
-
-                <div className="container relative mx-auto px-4 sm:px-6 lg:px-8">
+            <section className="pb-16 pt-28 sm:pt-36 md:pt-44 bg-white">
+                <div className="container mx-auto px-4 sm:px-6 lg:px-8">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.5 }}
-                        className="text-center max-w-3xl mx-auto"
+                        className="max-w-3xl"
                     >
-                        <Badge variant="outline" className="mb-4 bg-slate-50 text-indigo-700 border-indigo-100">
-                            <MessageSquare className="w-3 h-3 mr-1" />
-                            İLETİŞİM
-                        </Badge>
-
-                        <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-slate-900 mb-6">
-                            Bizimle <span className="text-indigo-600">İletişime Geçin</span>
+                        <p
+                            className="mb-8 text-xs font-semibold uppercase tracking-[0.2em] text-[#6b7280]"
+                            style={{ fontFamily: "var(--font-plus-jakarta-sans), system-ui, sans-serif" }}
+                        >
+                            İletişim
+                        </p>
+                        <h1
+                            className="text-5xl leading-[1.1] tracking-tight text-[#0f0f1a] sm:text-6xl md:text-7xl"
+                            style={{ fontFamily: "var(--font-playfair), Georgia, serif", fontWeight: 800 }}
+                        >
+                            Sizinle konuşmak isteriz.
                         </h1>
-
-                        <p className="text-lg text-slate-600 leading-relaxed">
-                            Sorularınız, önerileriniz veya işbirliği teklifleriniz için bizimle iletişime geçin.
-                            Size en kısa sürede dönüş yapacağız.
+                        <p className="mt-8 max-w-xl text-lg leading-relaxed text-slate-500">
+                            Sorularınız, önerileriniz veya işbirliği teklifleriniz için bize yazın.
+                            En kısa sürede dönüş yapacağız.
                         </p>
                     </motion.div>
                 </div>

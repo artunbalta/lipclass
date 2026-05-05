@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Chalk | Hakkımızda",
@@ -8,119 +7,113 @@ export const metadata: Metadata = {
     "Chalk hakkında: öğretmenlerin yükünü hafifletip her öğrenciye seviyesine göre ders veren yapay zeka platformu.",
 };
 
-const chalkText: React.CSSProperties = {
-  fontFamily: "var(--font-caveat), system-ui, sans-serif",
-  color: "#f5f5f0",
-  textShadow:
-    "0 0 1px rgba(255,255,255,0.55), 0 0 6px rgba(255,255,255,0.12), 0 1px 0 rgba(0,0,0,0.25)",
-  letterSpacing: "0.01em",
-};
-
-const chalkboardBg: React.CSSProperties = {
-  backgroundColor: "#1f3a2e",
-  backgroundImage: [
-    "radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)",
-    "radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)",
-    "radial-gradient(circle at 20% 30%, rgba(255,255,255,0.04), transparent 40%)",
-    "radial-gradient(circle at 80% 70%, rgba(255,255,255,0.03), transparent 45%)",
-  ].join(", "),
-  backgroundSize: "3px 3px, 7px 7px, 100% 100%, 100% 100%",
-  backgroundPosition: "0 0, 1px 2px, 0 0, 0 0",
-};
-
 export default function AboutPage() {
   return (
-    <main className="relative min-h-screen overflow-hidden" style={chalkboardBg}>
-      {/* Wooden frame top edge */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-3 bg-gradient-to-b from-[#3d2a17] to-[#5a3d22]" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3 bg-gradient-to-t from-[#3d2a17] to-[#5a3d22]" />
-
-      {/* Soft chalk dust streaks */}
-      <div
-        className="pointer-events-none absolute inset-0 opacity-30"
-        style={{
-          background:
-            "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 30%, transparent 60%), linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.03) 70%, transparent 100%)",
-        }}
-        aria-hidden
-      />
-
-      <div className="relative mx-auto flex min-h-screen max-w-4xl flex-col px-6 py-16 sm:px-10 sm:py-20 md:py-24">
-        <Link
-          href="/trial"
-          className="mb-12 inline-flex w-fit items-center gap-2 text-sm transition-opacity hover:opacity-100"
-          style={{ ...chalkText, opacity: 0.7 }}
+    <main className="min-h-screen bg-white text-[#0f0f1a]">
+      {/* Hero */}
+      <section className="mx-auto max-w-4xl px-6 pb-20 pt-28 sm:px-10 sm:pt-36 md:pt-44">
+        <p
+          className="mb-8 text-xs font-semibold uppercase tracking-[0.2em] text-[#6b7280]"
+          style={{ fontFamily: "var(--font-plus-jakarta-sans), system-ui, sans-serif" }}
         >
-          <ArrowLeft className="h-4 w-4" />
-          <span>geri</span>
-        </Link>
+          Vizyonumuz
+        </p>
 
-        <h1 className="text-6xl leading-tight sm:text-7xl md:text-8xl" style={chalkText}>
-          Hakkımızda
+        <h1
+          className="text-5xl leading-[1.1] tracking-tight sm:text-6xl md:text-7xl lg:text-[5.5rem]"
+          style={{ fontFamily: "var(--font-playfair), Georgia, serif", fontWeight: 800 }}
+        >
+          Chalk, öğretmenin&nbsp;yorgunluğu ile öğrencinin&nbsp;geride kalması arasındaki boşluğu&nbsp;kapatıyor.
         </h1>
+      </section>
 
-        <div className="mt-6 h-[2px] w-24" style={{ background: "rgba(245,245,240,0.45)" }} />
+      {/* Divider */}
+      <div className="mx-auto max-w-4xl px-6 sm:px-10">
+        <div className="h-px bg-[#e5e7eb]" />
+      </div>
 
-        <div className="mt-10 space-y-8 text-2xl leading-relaxed sm:text-3xl md:text-[2rem] md:leading-[1.5]" style={chalkText}>
-          <p>
-            Chalk, öğretmenlerin yükünü hafifletmek ve her öğrenciye kendi
-            seviyesine göre ders verebilmek için kuruldu.
-          </p>
+      {/* Body */}
+      <section className="mx-auto max-w-4xl space-y-10 px-6 py-20 sm:px-10">
+        <p
+          className="text-xl leading-[1.75] text-[#374151] sm:text-2xl sm:leading-[1.8]"
+          style={{ fontFamily: "var(--font-plus-jakarta-sans), system-ui, sans-serif" }}
+        >
+          Bir öğretmen aynı dersi yıllarca tekrar tekrar anlatır. Kimileri için hız çok hızlı,
+          kimileri için çok yavaş. Hazırlık saatleri biter, pekiştirme olmaz. Chalk bunun
+          için var.
+        </p>
+        <p
+          className="text-xl leading-[1.75] text-[#374151] sm:text-2xl sm:leading-[1.8]"
+          style={{ fontFamily: "var(--font-plus-jakarta-sans), system-ui, sans-serif" }}
+        >
+          Tek bir ders videosunu platforma yükleyin; yapay zekamız saniyeler içinde
+          MEB müfredatına uyumlu özetler, quizler ve seviye bazlı materyaller üretir.
+          İleri, orta, başlangıç — her öğrenci kendi hızında ilerler.
+        </p>
+        <p
+          className="text-xl leading-[1.75] text-[#374151] sm:text-2xl sm:leading-[1.8]"
+          style={{ fontFamily: "var(--font-plus-jakarta-sans), system-ui, sans-serif" }}
+        >
+          Tüm veriler Türkiye sunucularında tutulur, KVKK'ya tam uyumlu.
+          Kurulum yok, entegrasyon yok — sadece yükle ve öğret.
+        </p>
+      </section>
 
-          <p>
-            Tek bir ders videosundan; özetler, quizler, seviye bazlı içerikler
-            ve pekiştirme materyalleri üretiyoruz. Müfredat MEB ile uyumlu,
-            veriler Türkiye sunucularında, KVKK güvencesi altında.
-          </p>
-
-          <p>
-            Amacımız basit: öğretmen tekrar tekrar aynı dersi anlatmasın,
-            öğrenci de geride kalmasın.
-          </p>
+      {/* Stats */}
+      <section className="border-t border-[#e5e7eb] bg-[#f9fafb]">
+        <div className="mx-auto grid max-w-4xl grid-cols-1 divide-y divide-[#e5e7eb] px-6 sm:grid-cols-3 sm:divide-x sm:divide-y-0 sm:px-10">
+          {[
+            { number: "10×", label: "Öğretmen zamanı kazancı" },
+            { number: "%100", label: "MEB müfredat uyumu" },
+            { number: "3 adım", label: "Video → Analiz → Ders" },
+          ].map((s) => (
+            <div key={s.label} className="py-12 sm:px-10 sm:first:pl-0 sm:last:pr-0">
+              <div
+                className="text-5xl leading-none sm:text-6xl"
+                style={{
+                  fontFamily: "var(--font-playfair), Georgia, serif",
+                  fontWeight: 800,
+                  color: "#0f0f1a",
+                }}
+              >
+                {s.number}
+              </div>
+              <p
+                className="mt-3 text-base text-[#6b7280]"
+                style={{ fontFamily: "var(--font-plus-jakarta-sans), system-ui, sans-serif" }}
+              >
+                {s.label}
+              </p>
+            </div>
+          ))}
         </div>
+      </section>
 
-        <div className="mt-16 grid grid-cols-1 gap-8 sm:grid-cols-3" style={chalkText}>
-          <div>
-            <div className="text-5xl sm:text-6xl">10x</div>
-            <p className="mt-2 text-lg sm:text-xl" style={{ opacity: 0.75 }}>
-              öğretmen zamanı kazandırır
-            </p>
-          </div>
-          <div>
-            <div className="text-5xl sm:text-6xl">%100</div>
-            <p className="mt-2 text-lg sm:text-xl" style={{ opacity: 0.75 }}>
-              MEB müfredat uyumu
-            </p>
-          </div>
-          <div>
-            <div className="text-5xl sm:text-6xl">3 adım</div>
-            <p className="mt-2 text-lg sm:text-xl" style={{ opacity: 0.75 }}>
-              video → analiz → ders
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-20 flex flex-col gap-4 sm:flex-row sm:items-center">
+      {/* CTA */}
+      <section className="mx-auto max-w-4xl px-6 py-24 sm:px-10">
+        <h2
+          className="mb-10 max-w-2xl text-4xl leading-[1.2] sm:text-5xl"
+          style={{ fontFamily: "var(--font-playfair), Georgia, serif", fontWeight: 800 }}
+        >
+          Okulunuzu geleceğe taşımaya hazır mısınız?
+        </h2>
+        <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
           <Link
-            href="/trial"
-            className="inline-flex items-center gap-2 rounded-full px-8 py-3 text-2xl transition-transform hover:scale-[1.02]"
-            style={{
-              ...chalkText,
-              border: "2px solid rgba(245,245,240,0.7)",
-              backgroundColor: "rgba(255,255,255,0.04)",
-            }}
+            href="/signup"
+            className="inline-block rounded-full bg-[#0f0f1a] px-8 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#1f1f2e]"
+            style={{ fontFamily: "var(--font-plus-jakarta-sans), system-ui, sans-serif" }}
           >
-            Ücretsiz Dene
+            Ücretsiz Başla
           </Link>
           <Link
             href="/contact"
-            className="inline-flex items-center gap-2 px-2 py-3 text-2xl"
-            style={{ ...chalkText, opacity: 0.7 }}
+            className="text-sm font-medium text-[#6b7280] underline-offset-4 transition-colors hover:text-[#0f0f1a] hover:underline"
+            style={{ fontFamily: "var(--font-plus-jakarta-sans), system-ui, sans-serif" }}
           >
-            Bizimle iletişime geç →
+            Demo talep edin →
           </Link>
         </div>
-      </div>
+      </section>
     </main>
   );
 }

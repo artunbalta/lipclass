@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Chalk | Ücretsiz Denemeye Başla",
+  title: "Chalk | Platformu Keşfet",
   description:
-    "Chalk'ı ücretsiz deneyin. Tek bir video ile tüm müfredatı, her öğrenci seviyesi için özelleştirilmiş derslere dönüştürün.",
+    "Chalk platformunu keşfedin. Tek bir video ile tüm müfredatı, her öğrenci seviyesi için özelleştirilmiş derslere dönüştürün.",
 };
 
 export default function TrialLayout({
@@ -11,15 +11,5 @@ export default function TrialLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <>
-      {/* Hide the root LiquidEther background for this route */}
-      <style>{`
-        body > div[style*="position: fixed"] {
-          display: none !important;
-        }
-      `}</style>
-      {children}
-    </>
-  );
+  return <>{children}</>;
 }

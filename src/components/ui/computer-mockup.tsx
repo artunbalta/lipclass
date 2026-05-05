@@ -1,12 +1,14 @@
 "use client";
 
 import { Lock } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 
 interface ComputerMockupProps {
   videoSrc?: string;
   poster?: string;
   url?: string;
+  clipEnd?: number;
   className?: string;
 }
 
@@ -14,8 +16,25 @@ export function ComputerMockup({
   videoSrc = "/chalkdemo.mov",
   poster,
   url = "chalk.app/dashboard",
+  clipEnd = 20,
   className,
 }: ComputerMockupProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handleTimeUpdate = () => {
+      if (video.currentTime >= clipEnd) {
+        video.currentTime = 0;
+      }
+    };
+
+    video.addEventListener("timeupdate", handleTimeUpdate);
+    return () => video.removeEventListener("timeupdate", handleTimeUpdate);
+  }, [clipEnd]);
+
   return (
     <div
       className={cn(
@@ -37,13 +56,13 @@ export function ComputerMockup({
         <div className="w-[52px]" aria-hidden />
       </div>
 
-      {/* Video area (16:9) */}
-      <div className="relative aspect-video w-full bg-black">
+      {/* Video area — object-cover fills frame, edges cropped */}
+      <div className="relative aspect-video w-full overflow-hidden bg-black">
         <video
+          ref={videoRef}
           src={videoSrc}
           poster={poster}
           autoPlay
-          loop
           muted
           playsInline
           className="absolute inset-0 h-full w-full object-cover"
