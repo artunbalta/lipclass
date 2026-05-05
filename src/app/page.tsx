@@ -162,7 +162,7 @@ export default function HomePage() {
                   {[
                     { id: "blis", src: "/okullar/blislogo.png", alt: "Blis Koleji" },
                     { id: "eyuboglu", src: "/okullar/eyuboglulogo.png", alt: "Eyüboğlu Koleji" },
-                    { id: "ted", src: "/okullar/tedlogo.png", alt: "TED Ankara Koleji" },
+                    { id: "ted", src: "/okullar/tedlogo.png?v=2", alt: "TED Ankara Koleji" },
                     { id: "tfl", src: "/okullar/tfllogo.png", alt: "TFL Koleji" },
                   ].map((logo) => (
                     <div
