@@ -9,7 +9,8 @@
     "dev:8080": "next dev -p 8080",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "upload-frames": "node --env-file=.env.local scripts/upload-frames.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -30,6 +31,7 @@
     "@tsparticles/react": "^3.0.0",
     "@tsparticles/slim": "^3.9.1",
     "@types/katex": "^0.16.8",
+    "@vercel/blob": "^2.3.3",
     "canvas": "^3.2.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

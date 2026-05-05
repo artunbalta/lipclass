@@ -129,19 +129,41 @@ const ChalkHero = () => {
   const logoRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const imagesRef = useRef<HTMLImageElement[]>([]);
+  const loadedSetRef = useRef<Set<number>>(new Set());
+  const maxLoadedRef = useRef(-1);
   const currentFrameRef = useRef(0);
   const frameCountRef = useRef(0);
   const rafRef = useRef<number | null>(null);
   const [frameCount, setFrameCount] = useState(0);
   const [loadedCount, setLoadedCount] = useState(0);
 
-  const drawFrame = (idx: number) => {
+  const drawFrame = (requestedIdx: number) => {
     const canvas = canvasRef.current;
     const sticky = stickyRef.current;
-    const img = imagesRef.current[idx];
-    if (!canvas || !sticky || !img || !img.complete || !img.naturalWidth) return;
+    if (!canvas || !sticky) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
+    // If the requested frame isn't loaded yet, fall back to the latest loaded
+    // frame at or before it. The demo video overlay must reflect the frame we
+    // actually draw — never the un-rendered target — otherwise it would fade
+    // in over a stale earlier frame.
+    let idx = requestedIdx;
+    let img = imagesRef.current[idx];
+    if (!img || !img.complete || !img.naturalWidth) {
+      const loaded = loadedSetRef.current;
+      let fallback = -1;
+      for (let i = requestedIdx; i >= 0; i--) {
+        if (loaded.has(i)) {
+          fallback = i;
+          break;
+        }
+      }
+      if (fallback < 0) return;
+      idx = fallback;
+      img = imagesRef.current[idx];
+      if (!img || !img.complete || !img.naturalWidth) return;
+    }
 
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const cssW = sticky.clientWidth;
@@ -226,8 +248,17 @@ const ChalkHero = () => {
           img.onload = () => {
             if (cancelled) return;
             loaded++;
+            loadedSetRef.current.add(i);
+            if (i > maxLoadedRef.current) maxLoadedRef.current = i;
             setLoadedCount(loaded);
-            if (i === 0) drawFrame(0);
+            // Redraw if this newly-loaded frame is the closest available match
+            // to what the user is currently scrolled to.
+            const requested = currentFrameRef.current;
+            if (i === requested || (i < requested && i > maxLoadedRef.current - 1 && !loadedSetRef.current.has(requested))) {
+              drawFrame(requested);
+            } else if (i === 0 && requested === 0) {
+              drawFrame(0);
+            }
           };
           images[i] = img;
         }
