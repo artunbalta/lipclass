@@ -362,7 +362,7 @@ const ChalkHero = () => {
             loop
             playsInline
             className="h-full w-full object-cover"
-            src="/chalkdemo.mov"
+            src="https://3fkk1qxs9lyugzvw.public.blob.vercel-storage.com/chalkdemo.mp4"
           />
         </div>
 
