@@ -34,6 +34,10 @@ const caveat = Caveat({
 });
 
 export const metadata: Metadata = {
+  icons: {
+    icon: [{ url: "/chalk-logo-dark.png", type: "image/png" }],
+    apple: "/chalk-logo-dark.png",
+  },
   title: "Chalk | Okulunuzun En Üretken Öğretmeni: Yapay Zeka",
   description:
     "Öğretmenleriniz yorulmasın. Tek bir video ile tüm müfredatı, her öğrenci seviyesi için özelleştirilmiş derslere dönüştürün. MEB uyumlu, KVKK güvenceli.",
