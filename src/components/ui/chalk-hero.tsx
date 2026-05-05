@@ -276,13 +276,35 @@ const ChalkHero = () => {
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
+
+    // iOS Safari often refuses to autoplay despite muted+playsInline+autoplay,
+    // especially when the element starts at 0×0. Force a load and call play()
+    // explicitly. If the first attempt is rejected (e.g. user hasn't touched
+    // the page yet), retry on the first user interaction.
+    video.muted = true;
+    video.load();
+    const tryPlay = () => video.play().catch(() => {});
+    tryPlay();
+
+    const onFirstTouch = () => {
+      tryPlay();
+      window.removeEventListener("touchstart", onFirstTouch);
+      window.removeEventListener("click", onFirstTouch);
+    };
+    window.addEventListener("touchstart", onFirstTouch, { passive: true, once: true });
+    window.addEventListener("click", onFirstTouch, { once: true });
+
     const onTimeUpdate = () => {
       if (video.currentTime >= VIDEO_CLIP_END) {
         video.currentTime = 0;
       }
     };
     video.addEventListener("timeupdate", onTimeUpdate);
-    return () => video.removeEventListener("timeupdate", onTimeUpdate);
+    return () => {
+      video.removeEventListener("timeupdate", onTimeUpdate);
+      window.removeEventListener("touchstart", onFirstTouch);
+      window.removeEventListener("click", onFirstTouch);
+    };
   }, []);
 
   useEffect(() => {
@@ -361,6 +383,8 @@ const ChalkHero = () => {
             muted
             loop
             playsInline
+            preload="auto"
+            disableRemotePlayback
             className="h-full w-full object-cover"
             src="https://3fkk1qxs9lyugzvw.public.blob.vercel-storage.com/chalkdemo.mp4"
           />

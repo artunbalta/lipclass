@@ -119,10 +119,10 @@ export default function HomePage() {
                   </p>
                 </FadeIn>
 
-                <div className="grid gap-6 md:grid-cols-3">
+                <div className="grid gap-6 md:grid-cols-3 md:items-stretch">
                   {steps.map((step, i) => (
-                    <FadeIn key={step.number} delay={i * 0.12}>
-                      <div className="group relative overflow-hidden rounded-2xl border border-white/8 bg-white/[0.03] p-8 transition-colors hover:border-white/15 hover:bg-white/[0.06]">
+                    <FadeIn key={step.number} delay={i * 0.12} className="h-full">
+                      <div className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-white/8 bg-white/[0.03] p-8 transition-colors hover:border-white/15 hover:bg-white/[0.06]">
                         <span className="mb-6 block font-mono text-6xl font-bold leading-none text-white/[0.06] select-none">
                           {step.number}
                         </span>
@@ -160,9 +160,12 @@ export default function HomePage() {
                   gap={120}
                 >
                   {[
-                    { id: "blis", src: "/okullar/blislogo.png", alt: "Blis Koleji" },
-                    { id: "eyuboglu", src: "/okullar/eyuboglulogo.png", alt: "Eyüboğlu Koleji" },
-                    { id: "tfl", src: "/okullar/tfllogo.png", alt: "TFL Koleji" },
+                    { id: "blis-a", src: "/okullar/blislogo.png", alt: "Blis Koleji" },
+                    { id: "eyuboglu-a", src: "/okullar/eyuboglulogo.png", alt: "Eyüboğlu Koleji" },
+                    { id: "tfl-a", src: "/okullar/tfllogo.png", alt: "TFL Koleji" },
+                    { id: "blis-b", src: "/okullar/blislogo.png", alt: "Blis Koleji" },
+                    { id: "eyuboglu-b", src: "/okullar/eyuboglulogo.png", alt: "Eyüboğlu Koleji" },
+                    { id: "tfl-b", src: "/okullar/tfllogo.png", alt: "TFL Koleji" },
                   ].map((logo) => (
                     <div
                       key={logo.id}
