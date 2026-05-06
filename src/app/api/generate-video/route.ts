@@ -285,7 +285,7 @@ Return ONLY valid JSON, nothing else. Format:
     prompt: userPrompt,
     system_prompt: systemPrompt,
     model: 'google/gemini-2.5-flash-lite',
-    max_tokens: 8000,
+    max_tokens: 16000,
     temperature: 0.7,
   });
 
@@ -419,13 +419,35 @@ Return ONLY valid JSON, nothing else. Format:
     throw new Error('Invalid slides format: missing slides array');
   }
   // Validate and sanitize slides
-  const slides = parsed.slides.slice(0, 10).map((s: Record<string, unknown>, i: number) => ({
-    slideNumber: i + 1,
-    title: String(s.title || `Slayt ${i + 1}`),
-    content: String(s.content || ''),
-    bulletPoints: Array.isArray(s.bulletPoints) ? s.bulletPoints.map(String) : [],
-    narrationText: String(s.narrationText || s.narration || ''),
-  }));
+  const slides = parsed.slides.slice(0, 10).map((s: Record<string, unknown>, i: number) => {
+    const slideNumber = i + 1;
+    const rawContent = String(s.content || '').trim();
+    const bulletPoints = Array.isArray(s.bulletPoints) ? s.bulletPoints.map(String) : [];
+    const narrationText = String(s.narrationText || s.narration || '').trim();
+
+    // If the LLM returned an empty content AND no bullets (e.g. truncated by
+    // max_tokens), fall back to the narration text so the user at least sees
+    // the spoken content rendered, instead of a blank slide.
+    let content = rawContent;
+    if (!content && bulletPoints.length === 0 && narrationText) {
+      console.warn(`[Slides] slide ${slideNumber} had empty content; falling back to narration`);
+      content = narrationText;
+    }
+
+    return {
+      slideNumber,
+      title: String(s.title || `Slayt ${slideNumber}`),
+      content,
+      bulletPoints,
+      narrationText,
+    };
+  });
+
+  const emptyCount = slides.filter((s) => !s.content && s.bulletPoints.length === 0).length;
+  if (emptyCount > 0) {
+    console.warn(`[Slides] ${emptyCount}/${slides.length} slides have no displayable content`);
+  }
+
   return { slides };
 }
 

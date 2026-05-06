@@ -77,9 +77,10 @@ let mermaidCounter = 0;
 interface AnimationPlayerProps {
   animationUrl: string;
   onEnded: () => void;
+  onError: () => void;
 }
 
-function AnimationPlayer({ animationUrl, onEnded }: AnimationPlayerProps) {
+function AnimationPlayer({ animationUrl, onEnded, onError }: AnimationPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -97,6 +98,7 @@ function AnimationPlayer({ animationUrl, onEnded }: AnimationPlayerProps) {
         ref={videoRef}
         src={animationUrl}
         onEnded={onEnded}
+        onError={onError}
         controls
         playsInline
         className="w-full h-full object-contain"
@@ -155,7 +157,13 @@ export default function SlideRenderer({ slide, className = '' }: SlideRendererPr
   const contentRef = useRef<HTMLDivElement>(null);
   const bulletsRef = useRef<HTMLUListElement>(null);
 
-  const hasAnimation = Boolean(slide.animationUrl);
+  // Track per-slide animation failures so we don't keep retrying a known-bad
+  // URL on every re-render. Stored by slide number; cleared when the slide
+  // changes back (in case the URL was repaired upstream).
+  const [animationFailed, setAnimationFailed] = useState<Record<number, boolean>>({});
+  const animationBroken = animationFailed[slide.slideNumber] === true;
+  const hasAnimation = Boolean(slide.animationUrl) && !animationBroken;
+
   // Auto-select the animation tab when a new slide with animation is entered
   const [activeTab, setActiveTab] = useState<ActiveTab>(hasAnimation ? 'animation' : 'slide');
 
@@ -218,11 +226,15 @@ export default function SlideRenderer({ slide, className = '' }: SlideRendererPr
       </div>
 
       {/* Animation tab */}
-      {activeTab === 'animation' && slide.animationUrl && (
+      {activeTab === 'animation' && slide.animationUrl && !animationBroken && (
         <div className="flex-grow rounded-xl overflow-hidden" style={{ minHeight: '320px' }}>
           <AnimationPlayer
             animationUrl={slide.animationUrl}
             onEnded={() => setActiveTab('slide')}
+            onError={() => {
+              setAnimationFailed((prev) => ({ ...prev, [slide.slideNumber]: true }));
+              setActiveTab('slide');
+            }}
           />
         </div>
       )}
@@ -235,12 +247,24 @@ export default function SlideRenderer({ slide, className = '' }: SlideRendererPr
             {slide.title}
           </h2>
 
+          {animationBroken && (
+            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Bu slayt için animasyon yüklenemedi, slayt görünümü gösteriliyor.
+            </div>
+          )}
+
           {/* Content */}
-          {slide.content && (
+          {slide.content ? (
             <div
               ref={contentRef}
               className="text-sm sm:text-base text-gray-700 leading-relaxed mb-4 flex-grow"
             />
+          ) : (
+            (!slide.bulletPoints || slide.bulletPoints.length === 0) && (
+              <div className="flex-grow flex items-center justify-center text-sm text-gray-400 italic">
+                Bu slayt için içerik bulunamadı.
+              </div>
+            )
           )}
 
           {/* Bullet Points */}
