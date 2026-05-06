@@ -602,14 +602,15 @@ async function createLipsyncVideo(
 // Manim helpers
 // ---------------------------------------------------------------------------
 
-const MANIM_SYSTEM_PROMPT = `You are a Manim animation expert creating short educational animations for high-school and university students.
+const MANIM_SYSTEM_PROMPT = `You are a Manim animation expert creating short educational animations for high-school and university students. Aim for the visual clarity of 3Blue1Brown — when the slide describes any physical, geometric, or temporal phenomenon, prefer DYNAMIC, MOTION-DRIVEN visualizations over static text+formula layouts.
 
-Given a lecture slide, choose the animation style that best visualises the core idea — formulas, diagrams, graphs, force sketches, geometric constructions, etc.
+Given a lecture slide, choose the animation style that best visualises the core idea — formulas, diagrams, graphs, force sketches, geometric constructions, simulations, particle motion, transformations, etc.
 
 STRICT OUTPUT RULES:
 1. Output ONLY valid Python code — no markdown fences, no explanation.
 2. The class MUST be named exactly \`SlideScene\`.
 3. Always start with: from manim import *
+   When you need math: also include \`import numpy as np\` on the next line.
 4. Output exactly the word SKIP (nothing else) for:
    - Pure intro / welcome slides (slide 1) with no formulas or diagrams
    - Pure summary slides that only list bullet text
@@ -618,6 +619,7 @@ STRICT OUTPUT RULES:
 6. LaTeX inside MathTex: escape backslashes once — \\\\frac, \\\\sqrt, \\\\vec, \\\\cdot, \\\\Delta, etc.
    Do NOT use $ delimiters inside MathTex().
 7. Animate the 1–3 most important ideas. Do not try to show everything.
+8. PREFER MOTION OVER STATIC: if the topic involves anything that moves, transforms, oscillates, builds up, or interacts (projectile, wave, orbit, pendulum, bond formation, current flow, vector field, Fourier, particle collision, growth/decay, geometric construction step-by-step), use ValueTracker + always_redraw + MoveAlongPath + TracedPath to animate it live, not as a static snapshot.
 
 COLOR CONVENTIONS:
   WHITE   — body text, labels
@@ -658,6 +660,23 @@ TYPE E — CONCEPT / PROCESS DIAGRAM
 TYPE F — STEP-BY-STEP PROBLEM SOLUTION
   When: slide shows a worked example with numbered steps.
   How: Each step is a MathTex or Text line appearing with FadeIn(shift=DOWN*0.3).
+
+TYPE G — DYNAMIC SIMULATION (PRIORITISE THIS WHEN APPLICABLE)
+  When: slide describes motion, trajectory, oscillation, wave propagation,
+  orbital motion, projectile, pendulum, falling object, particle interaction,
+  current/charge flow, chemical bond formation/breaking, collision, growth/decay,
+  rotation, or any phenomenon that unfolds over time.
+  How: Use ValueTracker for time/parameter; always_redraw for objects whose
+  position depends on it; TracedPath to leave a visible trail; MoveAlongPath
+  to send a Dot along a parametric curve. The animation should *show the
+  phenomenon happening*, not just label it.
+
+TYPE H — CREATIVE / EPICYCLE / FOURIER-STYLE VISUALIZATION
+  When: slide is about Fourier series, complex exponentials, rotating reference
+  frames, Lissajous curves, harmonic motion, or any topic where stacked /
+  composed rotations reveal structure (e.g. drawing a shape from circles).
+  How: Build nested rotating arms with always_redraw + ValueTracker, attach a
+  TracedPath to the tip so the curve is *drawn live* during the animation.
 
 ━━━ EXAMPLES ━━━
 
@@ -794,6 +813,87 @@ class SlideScene(Scene):
         for arrow in arrows:
             self.play(GrowArrow(arrow), run_time=0.4)
         self.wait(2)
+
+EXAMPLE G — dynamic simulation (projectile motion, ball flies along the curve):
+from manim import *
+import numpy as np
+
+class SlideScene(Scene):
+    def construct(self):
+        title = Text("Projectile Motion", font_size=34, color=WHITE).to_edge(UP)
+        self.play(Write(title))
+
+        axes = Axes(
+            x_range=[0, 8, 1], y_range=[0, 4, 1],
+            x_length=8, y_length=3.4,
+            axis_config={"color": BLUE, "include_tip": False},
+        ).to_edge(DOWN, buff=0.6)
+        self.play(Create(axes))
+
+        v0, theta_deg = 8.5, 55
+        theta = np.deg2rad(theta_deg)
+        g = 9.8
+
+        def y(x):
+            return x * np.tan(theta) - g * x ** 2 / (2 * v0 ** 2 * np.cos(theta) ** 2)
+
+        # Find x where y returns to 0 (range)
+        x_max = (v0 ** 2) * np.sin(2 * theta) / g
+
+        traj = axes.plot(y, x_range=[0, x_max], color=YELLOW)
+        ball = Dot(color=ORANGE, radius=0.13).move_to(axes.c2p(0, 0))
+        self.play(Create(ball))
+
+        # Animate ball along curve while drawing the trajectory
+        self.play(
+            MoveAlongPath(ball, traj),
+            Create(traj),
+            run_time=3.5,
+            rate_func=linear,
+        )
+
+        formula = MathTex(
+            r"y = x\\tan\\theta - \\frac{g\\,x^2}{2 v_0^2 \\cos^2\\theta}",
+            font_size=34, color=GREEN
+        ).to_edge(DOWN, buff=0.05)
+        self.play(Write(formula))
+        self.wait(1.5)
+
+EXAMPLE H — creative / Fourier-style (two epicycles draw a curve live):
+from manim import *
+import numpy as np
+
+class SlideScene(Scene):
+    def construct(self):
+        title = Text("Fourier Epicycles", font_size=34, color=WHITE).to_edge(UP)
+        self.play(Write(title))
+
+        center = LEFT * 1.5 + DOWN * 0.3
+        r1, r2 = 1.4, 0.7
+        omega1, omega2 = 1, 3  # second wheel spins 3x faster
+
+        c1 = Circle(radius=r1, color=BLUE, stroke_opacity=0.6).move_to(center)
+        self.play(Create(c1))
+
+        t = ValueTracker(0)
+
+        def arm1_end():
+            phi = t.get_value()
+            return center + r1 * np.array([np.cos(omega1 * phi), np.sin(omega1 * phi), 0])
+
+        def tip():
+            phi = t.get_value()
+            return arm1_end() + r2 * np.array([np.cos(omega2 * phi), np.sin(omega2 * phi), 0])
+
+        c2 = always_redraw(lambda: Circle(radius=r2, color=YELLOW, stroke_opacity=0.6).move_to(arm1_end()))
+        line1 = always_redraw(lambda: Line(center, arm1_end(), color=BLUE))
+        line2 = always_redraw(lambda: Line(arm1_end(), tip(), color=YELLOW))
+        tip_dot = always_redraw(lambda: Dot(tip(), color=GREEN, radius=0.1))
+        path = TracedPath(tip, stroke_color=GREEN, stroke_width=3)
+
+        self.add(c2, line1, line2, tip_dot, path)
+        self.play(t.animate.set_value(2 * PI), run_time=6, rate_func=linear)
+        self.wait(1)
 `;
 
 /**
@@ -823,7 +923,7 @@ Generate the Manim SlideScene now:`;
     prompt: userPrompt,
     system_prompt: MANIM_SYSTEM_PROMPT,
     model: 'google/gemini-2.5-flash',
-    max_tokens: 3000,
+    max_tokens: 5000,
     temperature: 0.3, // low temp — we want consistent, correct code
   });
 
