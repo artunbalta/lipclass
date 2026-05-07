@@ -385,8 +385,8 @@ const ChalkHero = () => {
             playsInline
             preload="auto"
             disableRemotePlayback
-            className="h-full w-full object-contain object-center"
-            src="/demo2.mp4"
+            className="h-full w-full object-cover"
+            src="https://3fkk1qxs9lyugzvw.public.blob.vercel-storage.com/chalkdemo.mp4"
           />
         </div>
 

@@ -13,7 +13,7 @@ interface ComputerMockupProps {
 }
 
 export function ComputerMockup({
-  videoSrc = "/demo2.mp4",
+  videoSrc = "/chalkdemo.mov",
   poster,
   url = "chalk.app/dashboard",
   clipEnd = 20,
@@ -56,7 +56,7 @@ export function ComputerMockup({
         <div className="w-[52px]" aria-hidden />
       </div>
 
-      {/* Video area — object-contain: full frame visible, no side crop */}
+      {/* Video area — object-cover fills frame, edges cropped */}
       <div className="relative aspect-video w-full overflow-hidden bg-black">
         <video
           ref={videoRef}
@@ -65,7 +65,7 @@ export function ComputerMockup({
           autoPlay
           muted
           playsInline
-          className="absolute inset-0 h-full w-full object-contain object-center"
+          className="absolute inset-0 h-full w-full object-cover"
         />
       </div>
     </div>
