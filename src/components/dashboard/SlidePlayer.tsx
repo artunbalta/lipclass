@@ -441,7 +441,7 @@ export default function SlidePlayer({
       <div className="relative w-full" style={{ aspectRatio: '16/9' }}>
         {/* Slide content */}
         <div className="absolute inset-0 p-4">
-          <SlideRenderer slide={currentSlide} className="h-full" />
+          <SlideRenderer slide={currentSlide} isPlaying={isPlaying} className="h-full" />
         </div>
 
         {/* Teacher video overlay (draggable, snap-to-corner) */}

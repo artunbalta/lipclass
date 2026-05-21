@@ -20,6 +20,7 @@ function initMermaid() {
 
 interface SlideRendererProps {
   slide: Slide;
+  isPlaying?: boolean;
   className?: string;
 }
 
@@ -76,30 +77,40 @@ let mermaidCounter = 0;
 // ---------------------------------------------------------------------------
 interface AnimationPlayerProps {
   animationUrl: string;
-  onEnded: () => void;
+  isPlaying: boolean;
   onError: () => void;
 }
 
-function AnimationPlayer({ animationUrl, onEnded, onError }: AnimationPlayerProps) {
+function AnimationPlayer({ animationUrl, isPlaying, onError }: AnimationPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  // Reset playhead when the animation URL changes (new slide)
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
     video.currentTime = 0;
-    video.play().catch(() => {
-      // autoplay blocked — user must click play
-    });
   }, [animationUrl]);
+
+  // Drive play/pause from parent so the animation stays in lockstep with the
+  // teacher video — both controlled by the single play/pause button.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (isPlaying) {
+      video.play().catch(() => {
+        // autoplay blocked — user must click play
+      });
+    } else {
+      video.pause();
+    }
+  }, [isPlaying]);
 
   return (
     <div className="flex flex-col items-center justify-center h-full bg-gray-950 rounded-xl overflow-hidden">
       <video
         ref={videoRef}
         src={animationUrl}
-        onEnded={onEnded}
         onError={onError}
-        controls
         playsInline
         className="w-full h-full object-contain"
         style={{ maxHeight: '100%' }}
@@ -153,7 +164,7 @@ function TabBar({ active, hasAnimation, onChange }: TabBarProps) {
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
-export default function SlideRenderer({ slide, className = '' }: SlideRendererProps) {
+export default function SlideRenderer({ slide, isPlaying = false, className = '' }: SlideRendererProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const bulletsRef = useRef<HTMLUListElement>(null);
 
@@ -230,7 +241,7 @@ export default function SlideRenderer({ slide, className = '' }: SlideRendererPr
         <div className="flex-grow rounded-xl overflow-hidden" style={{ minHeight: '320px' }}>
           <AnimationPlayer
             animationUrl={slide.animationUrl}
-            onEnded={() => setActiveTab('slide')}
+            isPlaying={isPlaying}
             onError={() => {
               setAnimationFailed((prev) => ({ ...prev, [slide.slideNumber]: true }));
               setActiveTab('slide');
