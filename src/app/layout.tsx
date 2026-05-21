@@ -35,8 +35,8 @@ const caveat = Caveat({
 
 export const metadata: Metadata = {
   icons: {
-    icon: [{ url: "/chalk-logo-dark.png", type: "image/png" }],
-    apple: "/chalk-logo-dark.png",
+    icon: [{ url: "/chalk_favicon.PNG", type: "image/png" }],
+    apple: "/chalk_favicon.PNG",
   },
   title: "Chalk | Okulunuzun En Üretken Öğretmeni: Yapay Zeka",
   description:

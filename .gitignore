@@ -38,3 +38,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# large local-only assets (kept out of the repo; serve from blob storage instead)
+/public/framesinteractive/
+/public/framesinteractive2/
+/public/chalkdemo.mp4
