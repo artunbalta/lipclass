@@ -93,6 +93,9 @@ function AnimationPlayer({ animationUrl, isPlaying, onError }: AnimationPlayerPr
 
   // Drive play/pause from parent so the animation stays in lockstep with the
   // teacher video — both controlled by the single play/pause button.
+  // animationUrl is included so navigating to the next slide while playing
+  // also auto-starts the new animation (otherwise the new <video> just sits
+  // paused at frame 0 because isPlaying didn't change).
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -103,7 +106,7 @@ function AnimationPlayer({ animationUrl, isPlaying, onError }: AnimationPlayerPr
     } else {
       video.pause();
     }
-  }, [isPlaying]);
+  }, [isPlaying, animationUrl]);
 
   return (
     <div className="flex flex-col items-center justify-center h-full bg-gray-950 rounded-xl overflow-hidden">
