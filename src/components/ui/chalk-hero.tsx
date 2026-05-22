@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useInView } from "framer-motion";
+import { AnimatePresence, motion, useInView } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -485,12 +485,72 @@ const ChalkHero = () => {
           * MEB müfredatı ile uyumlu, KVKK güvenceli
         </motion.p>
 
-        {/* Loading indicator */}
-        {isLoading && (
-          <div className="pointer-events-none absolute right-4 top-4 z-30 rounded-full border border-white/10 bg-black/60 px-3 py-1 text-[9px] font-medium uppercase tracking-widest text-white/60 backdrop-blur sm:right-6 sm:top-6 sm:text-[10px]">
-            Yükleniyor {progressPct}%
-          </div>
-        )}
+        {/* Loading overlay — covers the dark blank canvas until frames are ready.
+            "Chalk" is drawn stroke-by-stroke proportional to progressPct, so the
+            wordmark literally fills in as the page loads. */}
+        <AnimatePresence>
+          {isLoading && (
+            <motion.div
+              key="hero-loader"
+              initial={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+              className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#0e0e0e]"
+            >
+              {/* Blackboard noise texture */}
+              <div className="noise-overlay pointer-events-none absolute inset-0 opacity-60 mix-blend-overlay" />
+
+              {/* Subtle vignette */}
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_30%,rgba(0,0,0,0.6)_100%)]" />
+
+              {/* Chalk wordmark drawing itself */}
+              <svg
+                viewBox="0 0 600 180"
+                className="relative w-[65vw] max-w-md"
+                preserveAspectRatio="xMidYMid meet"
+                aria-hidden="true"
+              >
+                <text
+                  x="50%"
+                  y="50%"
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fontSize="140"
+                  fontWeight={700}
+                  fontFamily="ui-serif, Georgia, 'Times New Roman', serif"
+                  fontStyle="italic"
+                  letterSpacing="0.02em"
+                  fill="none"
+                  stroke="#E1E0CC"
+                  strokeWidth={2.5}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeDasharray={1000}
+                  strokeDashoffset={1000 - (progressPct / 100) * 1000}
+                  style={{
+                    transition: "stroke-dashoffset 400ms ease-out",
+                    filter: "drop-shadow(0 0 1px rgba(225,224,204,0.45))",
+                  }}
+                >
+                  Chalk
+                </text>
+              </svg>
+
+              {/* Progress + label */}
+              <div className="relative mt-8 flex items-center gap-3 text-[10px] font-medium uppercase tracking-[0.35em] text-white/45 sm:text-xs">
+                <motion.span
+                  animate={{ opacity: [0.35, 0.9, 0.35] }}
+                  transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+                >
+                  Yükleniyor
+                </motion.span>
+                <span className="font-mono text-white/60">
+                  %{progressPct.toString().padStart(2, "0")}
+                </span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </section>
   );
