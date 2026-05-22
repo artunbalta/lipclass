@@ -286,7 +286,7 @@ Return ONLY valid JSON, nothing else. Format:
     prompt: userPrompt,
     system_prompt: systemPrompt,
     model: 'google/gemini-2.5-flash-lite',
-    max_tokens: 16000,
+    max_tokens: 32000,
     temperature: 0.7,
   });
 
@@ -384,6 +384,16 @@ Return ONLY valid JSON, nothing else. Format:
             result.push('\\\\');
             i += 1;
           }
+        } else if (ch === '\n') {
+          // Literal newline inside a JSON string → escape it (JSON forbids raw newlines)
+          result.push('\\n');
+          i++;
+        } else if (ch === '\r') {
+          result.push('\\r');
+          i++;
+        } else if (ch === '\t') {
+          result.push('\\t');
+          i++;
         } else {
           result.push(ch);
           i++;
@@ -392,6 +402,45 @@ Return ONLY valid JSON, nothing else. Format:
     }
 
     return result.join('');
+  }
+
+  /**
+   * Last-resort recovery for truncated JSON output (LLM ran out of tokens
+   * mid-string). Finds the last complete slide object in the slides array,
+   * truncates everything after it, and re-closes the array + root object.
+   */
+  function recoverTruncatedJson(raw: string): string | null {
+    const slidesIdx = raw.indexOf('"slides"');
+    if (slidesIdx < 0) return null;
+    const arrStart = raw.indexOf('[', slidesIdx);
+    if (arrStart < 0) return null;
+
+    // Walk forward tracking brace depth, only counting structural braces
+    // (i.e., not braces inside strings). Record the end-position after each
+    // top-level slide object (depth returns to 1 inside the array).
+    let depth = 0;
+    let inStr = false;
+    let escape = false;
+    let lastGoodEnd = -1;
+    for (let i = arrStart; i < raw.length; i++) {
+      const c = raw[i];
+      if (escape) { escape = false; continue; }
+      if (inStr) {
+        if (c === '\\') escape = true;
+        else if (c === '"') inStr = false;
+        continue;
+      }
+      if (c === '"') { inStr = true; continue; }
+      if (c === '[' || c === '{') depth++;
+      else if (c === ']' || c === '}') {
+        depth--;
+        // After closing a slide object we are back inside the array (depth === 1)
+        if (c === '}' && depth === 1) lastGoodEnd = i;
+      }
+    }
+
+    if (lastGoodEnd < 0) return null;
+    return raw.slice(0, lastGoodEnd + 1) + ']}';
   }
 
   // Always sanitize before parsing
@@ -410,9 +459,26 @@ Return ONLY valid JSON, nothing else. Format:
         .replace(/,\s*]/g, ']');  // Remove trailing commas before ]
       parsed = JSON.parse(aggressive);
     } catch (secondError) {
-      console.error('[Slides] JSON parse failed. Raw output (first 800 chars):', jsonStr.substring(0, 800));
-      console.error('[Slides] Sanitized (first 800 chars):', sanitized.substring(0, 800));
-      throw new Error(`LLM çıktısı JSON olarak ayrıştırılamadı: ${secondError instanceof Error ? secondError.message : 'Parse error'}`);
+      // Last resort: output was likely truncated mid-string. Trim to the last
+      // complete slide and re-close the structure so we still get usable slides.
+      const recovered = recoverTruncatedJson(sanitized);
+      if (recovered) {
+        try {
+          parsed = JSON.parse(recovered);
+          const recoveredCount = Array.isArray((parsed as { slides?: unknown[] }).slides)
+            ? (parsed as { slides: unknown[] }).slides.length
+            : 0;
+          console.warn(`[Slides] Recovered ${recoveredCount} slide(s) from truncated output.`);
+        } catch {
+          console.error('[Slides] JSON parse failed. Raw output (first 800 chars):', jsonStr.substring(0, 800));
+          console.error('[Slides] Sanitized (first 800 chars):', sanitized.substring(0, 800));
+          throw new Error(`LLM çıktısı JSON olarak ayrıştırılamadı: ${secondError instanceof Error ? secondError.message : 'Parse error'}`);
+        }
+      } else {
+        console.error('[Slides] JSON parse failed. Raw output (first 800 chars):', jsonStr.substring(0, 800));
+        console.error('[Slides] Sanitized (first 800 chars):', sanitized.substring(0, 800));
+        throw new Error(`LLM çıktısı JSON olarak ayrıştırılamadı: ${secondError instanceof Error ? secondError.message : 'Parse error'}`);
+      }
     }
   }
 
