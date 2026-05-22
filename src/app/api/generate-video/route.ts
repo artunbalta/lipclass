@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { put } from '@vercel/blob';
 import { retrieveContext, isRagConfigured } from '@/lib/api/rag';
 import { isBunnyEnabled } from '@/lib/config/bunny-config';
 import { ingestFromUrl } from '@/lib/api/bunny-stream';
@@ -472,13 +473,84 @@ function cleanTextForTts(text: string): string {
 }
 
 /**
- * Convert text to speech using fal-ai/elevenlabs TTS
+ * Convert text to speech.
+ * Primary: ElevenLabs direct API with the teacher's cloned voice (ELEVENLABS_VOICE_ID).
+ * Fallback: fal-ai/elevenlabs premade voice (used if ELEVENLABS_API_KEY/VOICE_ID missing
+ * or the direct call fails).
  */
 async function textToSpeech(
   rawText: string,
   language: 'tr' | 'en'
 ): Promise<{ audio_url: string }> {
   const text = cleanTextForTts(rawText);
+
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  const voiceId = process.env.ELEVENLABS_VOICE_ID;
+
+  if (apiKey && voiceId) {
+    try {
+      return await textToSpeechElevenLabsDirect(text, voiceId, apiKey);
+    } catch (err) {
+      console.warn('[TTS] ElevenLabs direct call failed, falling back to fal.ai:', err);
+    }
+  }
+
+  return await textToSpeechFalFallback(text, language);
+}
+
+/**
+ * ElevenLabs direct TTS with cloned voice → upload mp3 to Vercel Blob → return public URL.
+ * VEED lipsync requires a fetchable audio URL.
+ */
+async function textToSpeechElevenLabsDirect(
+  text: string,
+  voiceId: string,
+  apiKey: string
+): Promise<{ audio_url: string }> {
+  const res = await fetch(
+    `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+    {
+      method: 'POST',
+      headers: {
+        'xi-api-key': apiKey,
+        'Content-Type': 'application/json',
+        'Accept': 'audio/mpeg',
+      },
+      body: JSON.stringify({
+        text,
+        model_id: 'eleven_multilingual_v2',
+        voice_settings: {
+          stability: 0.5,
+          similarity_boost: 0.8,
+          use_speaker_boost: true,
+        },
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`ElevenLabs TTS failed (${res.status}): ${errText}`);
+  }
+
+  const audioBuffer = await res.arrayBuffer();
+  const pathname = `tts/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.mp3`;
+
+  const blob = await put(pathname, audioBuffer, {
+    access: 'public',
+    contentType: 'audio/mpeg',
+  });
+
+  return { audio_url: blob.url };
+}
+
+/**
+ * Fallback: fal-ai/elevenlabs premade voice (legacy path).
+ */
+async function textToSpeechFalFallback(
+  text: string,
+  language: 'tr' | 'en'
+): Promise<{ audio_url: string }> {
   const modelPath = 'fal-ai/elevenlabs/text-to-dialogue/eleven-v3';
 
   const result = await falRequest<{ audio: { url: string } }>(
@@ -487,7 +559,7 @@ async function textToSpeech(
       inputs: [
         {
           text: text,
-          voice: 'Adam', // Male voice - ElevenLabs premade (deep, narration)
+          voice: 'Adam',
         },
       ],
       language_code: language,
