@@ -21,6 +21,8 @@ interface SlidePlayerProps {
   referenceVideoUrl?: string | null;
   title?: string;
   className?: string;
+  /** Forwarded to SlideRenderer so quiz answers can be logged to /api/quiz-attempts. */
+  videoId?: string;
 }
 
 /**
@@ -43,6 +45,7 @@ export default function SlidePlayer({
   referenceVideoUrl,
   title,
   className = '',
+  videoId,
 }: SlidePlayerProps) {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -281,13 +284,20 @@ export default function SlidePlayer({
   }, []);
 
   const handleToggleFullscreen = useCallback(() => {
-    if (!containerRef.current) return;
-    if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen().catch(() => { });
-      setIsFullscreen(true);
+    const el = containerRef.current;
+    if (!el) return;
+
+    const supportsNative = typeof el.requestFullscreen === 'function';
+
+    if (supportsNative) {
+      if (!document.fullscreenElement) {
+        el.requestFullscreen().catch(() => setIsFullscreen(true));
+      } else {
+        document.exitFullscreen().catch(() => setIsFullscreen(false));
+      }
     } else {
-      document.exitFullscreen().catch(() => { });
-      setIsFullscreen(false);
+      // iOS Safari: CSS-based fullscreen fallback
+      setIsFullscreen((prev) => !prev);
     }
   }, []);
 
@@ -441,7 +451,7 @@ export default function SlidePlayer({
       <div className="relative w-full" style={{ aspectRatio: '16/9' }}>
         {/* Slide content */}
         <div className="absolute inset-0 p-4">
-          <SlideRenderer slide={currentSlide} isPlaying={isPlaying} className="h-full" />
+          <SlideRenderer slide={currentSlide} isPlaying={isPlaying} className="h-full" videoId={videoId} />
         </div>
 
         {/* Teacher video overlay (draggable, snap-to-corner) */}

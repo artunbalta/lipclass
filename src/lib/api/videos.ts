@@ -5,7 +5,7 @@ const supabase = createClient();
 
 export async function getVideos(filters?: {
   teacherId?: string;
-  status?: 'draft' | 'processing' | 'published' | 'failed';
+  status?: 'draft' | 'slides_ready' | 'processing' | 'published' | 'failed';
   subject?: string;
   grade?: string;
 }) {
@@ -89,6 +89,7 @@ export async function createVideo(teacherId: string, videoData: CreateVideoFormD
       thumbnail_url: null,
       video_url: null,
       duration: null,
+      curriculum_codes: videoData.curriculumCodes || [],
     })
     .select(`
       *,
@@ -118,10 +119,39 @@ export async function updateVideo(id: string, updates: Partial<Video>) {
   if (updates.slidesData !== undefined) updatePayload.slides_data = updates.slidesData;
   if (updates.videoProvider !== undefined) updatePayload.video_provider = updates.videoProvider;
   if (updates.bunnyIngestionStatus !== undefined) updatePayload.bunny_ingestion_status = updates.bunnyIngestionStatus;
+  if (updates.slidesApprovedAt !== undefined) {
+    updatePayload.slides_approved_at = updates.slidesApprovedAt instanceof Date
+      ? updates.slidesApprovedAt.toISOString()
+      : updates.slidesApprovedAt;
+  }
+  if (updates.contentHash !== undefined) updatePayload.content_hash = updates.contentHash;
+  if (updates.generationProgress !== undefined) updatePayload.generation_progress = updates.generationProgress;
+  if (updates.curriculumCodes !== undefined) updatePayload.curriculum_codes = updates.curriculumCodes;
+  if (updates.parentVideoId !== undefined) updatePayload.parent_video_id = updates.parentVideoId;
+  if (updates.variantLabel !== undefined) updatePayload.variant_label = updates.variantLabel;
 
   const { data, error } = await supabase
     .from('videos')
     .update(updatePayload)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return mapDbVideoToVideo(data);
+}
+
+/**
+ * Persist only the slides_data JSONB. Used by the editor's "Save" action.
+ * Faster than a full updateVideo call when nothing else changed.
+ */
+export async function saveSlidesData(id: string, slidesData: SlidesData) {
+  const { data, error } = await supabase
+    .from('videos')
+    .update({ slides_data: slidesData })
     .eq('id', id)
     .select()
     .single();
@@ -240,5 +270,13 @@ function mapDbVideoToVideo(dbVideo: any): Video {
     difficulty: dbVideo.difficulty || undefined,
     videoProvider: dbVideo.video_provider || 'fal',
     bunnyIngestionStatus: dbVideo.bunny_ingestion_status || null,
+    slidesApprovedAt: dbVideo.slides_approved_at ? new Date(dbVideo.slides_approved_at) : undefined,
+    contentHash: dbVideo.content_hash || undefined,
+    generationProgress: dbVideo.generation_progress || null,
+    curriculumCodes: Array.isArray(dbVideo.curriculum_codes) ? dbVideo.curriculum_codes : [],
+    parentVideoId: dbVideo.parent_video_id || undefined,
+    variantLabel: dbVideo.variant_label || undefined,
+    language: (dbVideo.language as 'tr' | 'en') || undefined,
+    tone: dbVideo.tone || undefined,
   };
 }

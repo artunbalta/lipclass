@@ -26,9 +26,9 @@ import { useVideoStore } from '@/stores/video-store';
 import { showToast } from '@/lib/utils/toast';
 import { SUBJECTS, GRADES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import { generateVideo, GenerationProgress } from '@/lib/api/generation';
-import { getReferenceVideoUrl } from '@/lib/api/storage';
+import { generateSlidesOnly, GenerationProgress } from '@/lib/api/generation';
 import { useAuthStore } from '@/stores/auth-store';
+import { KazanimPicker } from '@/components/shared/KazanimPicker';
 
 const createVideoSchema = z.object({
   subject: z.string().min(1, 'Ders seçin'),
@@ -44,6 +44,7 @@ const createVideoSchema = z.object({
   language: z.enum(['tr', 'en']),
   sourceOnly: z.boolean(),
   sourceDocumentIds: z.array(z.string()),
+  curriculumCodes: z.array(z.string()),
 });
 
 type CreateVideoForm = z.infer<typeof createVideoSchema>;
@@ -113,6 +114,7 @@ export default function CreateVideoPage() {
       language: 'tr',
       sourceOnly: false,
       sourceDocumentIds: [],
+      curriculumCodes: [],
     },
   });
 
@@ -128,23 +130,20 @@ export default function CreateVideoPage() {
     setGenerationProgress({ stage: 'generating_slides', progress: 0 });
 
     try {
-      // Step 1: Create video record in database
+      // Step 1: Create video record (status='processing' initially)
       const video = await createVideo({
         ...data,
         learningObjectives: [],
         keyConcepts: [],
+        curriculumCodes: data.curriculumCodes,
       });
 
-      // Step 2: Fetch teacher's reference video URL for lipsync
-      const refVideoUrl = await getReferenceVideoUrl(user.id);
-      if (refVideoUrl) {
-        console.log('[Create] Reference video found for lipsync');
-      } else {
-        console.warn('[Create] No reference video - lipsync will be skipped');
-      }
+      // Step 2: Generate ONLY slide content (~10s).
+      // Teacher reviews/edits in the editor before paying for TTS+lipsync.
+      setIsSuccess(true); // show the progress overlay
+      setIsCreating(false);
 
-      // Step 3: Start full pipeline (LLM → TTS → Lipsync → Save)
-      generateVideo({
+      await generateSlidesOnly({
         videoId: video.id,
         teacherId: user.id,
         topic: data.topic,
@@ -155,36 +154,21 @@ export default function CreateVideoPage() {
         includesProblemSolving: data.includesProblemSolving,
         problemCount: data.problemCount,
         difficulty: data.difficulty,
-        referenceVideoUrl: refVideoUrl || undefined,
         sourceOnly: data.sourceOnly,
         sourceDocumentIds: data.sourceDocumentIds.length > 0 ? data.sourceDocumentIds : undefined,
-        onProgress: (progress) => {
-          setGenerationProgress(progress);
-        },
-      }).then(() => {
-        setGenerationProgress({ stage: 'completed' });
-        showToast.success('Ders hazır!', 'Ders sunumunuz başarıyla oluşturuldu.');
-        setTimeout(() => {
-          router.push('/dashboard/teacher/videos');
-        }, 2000);
-      }).catch((error) => {
-        console.error('Generation error:', error);
-        setGenerationProgress({
-          stage: 'failed',
-          error: error instanceof Error ? error.message : 'Ders oluşturulurken bir hata oluştu.',
-        });
-        showToast.error('Generation hatası', error instanceof Error ? error.message : 'Hata oluştu.');
+        onProgress: (progress) => setGenerationProgress(progress),
       });
 
-      setIsCreating(false);
-      setIsSuccess(true);
+      showToast.success('Slaytlar hazır!', 'Şimdi düzenle ve onayla.');
+      // Hand off to the editor; finalize (TTS+lipsync) happens there
+      router.push(`/dashboard/teacher/videos/${video.id}/edit`);
     } catch (error) {
       setIsCreating(false);
       setGenerationProgress({
         stage: 'failed',
-        error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+        error: error instanceof Error ? error.message : 'Bilinmeyen hata',
       });
-      showToast.error('Hata oluştu', 'Ders oluşturulurken bir sorun yaşandı. Lütfen tekrar deneyin.');
+      showToast.error('Hata oluştu', 'Slaytlar oluşturulurken bir sorun yaşandı. Lütfen tekrar deneyin.');
     }
   };
 
@@ -196,24 +180,8 @@ export default function CreateVideoPage() {
       switch (generationProgress.stage) {
         case 'generating_slides':
           return 'Slaytlar oluşturuluyor...';
-        case 'creating_audio': {
-          const audioProgress = generationProgress as { currentSlide?: number; totalSlides?: number };
-          if (audioProgress.currentSlide && audioProgress.totalSlides) {
-            return `Ses oluşturuluyor (${audioProgress.currentSlide}/${audioProgress.totalSlides})...`;
-          }
-          return 'Ses dosyaları oluşturuluyor...';
-        }
-        case 'creating_lipsync': {
-          const lipsyncProgress = generationProgress as { currentSlide?: number; totalSlides?: number };
-          if (lipsyncProgress.currentSlide && lipsyncProgress.totalSlides) {
-            return `Lipsync oluşturuluyor (${lipsyncProgress.currentSlide}/${lipsyncProgress.totalSlides})...`;
-          }
-          return 'Video senkronizasyonu yapılıyor...';
-        }
-        case 'saving':
-          return 'Kaydediliyor...';
         case 'completed':
-          return 'Ders hazır!';
+          return 'Slaytlar hazır!';
         case 'failed':
           return 'Hata oluştu';
         default:
@@ -239,9 +207,9 @@ export default function CreateVideoPage() {
               <div className="w-20 h-20 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-6">
                 <Check className="w-10 h-10 text-emerald-500" />
               </div>
-              <h2 className="text-2xl font-bold mb-2">Ders Hazır!</h2>
+              <h2 className="text-2xl font-bold mb-2">Slaytlar Hazır!</h2>
               <p className="text-muted-foreground mb-4">
-                Ders sunumunuz başarıyla oluşturuldu. Videolar sayfasına yönlendiriliyorsunuz...
+                Düzenleyiciye yönlendiriliyorsun. Slaytları inceleyip onayladıktan sonra ses ve video üretimi başlayacak.
               </p>
             </>
           ) : generationProgress.stage === 'failed' ? (
@@ -264,7 +232,7 @@ export default function CreateVideoPage() {
               </div>
               <h2 className="text-2xl font-bold mb-2">{getProgressLabel()}</h2>
               <p className="text-muted-foreground mb-6">
-                Ders sunumunuz hazırlanıyor. Bu işlem birkaç dakika sürebilir.
+                İlk aşama: 10 slaytlık ders taslağı oluşturuluyor (~10 saniye). Ses + video üretimi düzenleme sonrası başlayacak.
               </p>
 
               {/* Progress Bar */}
@@ -465,6 +433,30 @@ export default function CreateVideoPage() {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* MEB Kazanımları */}
+              <div className="p-6 rounded-xl border border-border bg-card">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    🎯 MEB Kazanımları
+                  </h3>
+                  {(watchAll.curriculumCodes?.length || 0) > 0 && (
+                    <Badge variant="secondary">
+                      {watchAll.curriculumCodes.length} kazanım seçili
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Bu dersle hangi MEB kazanımları işleniyor? Müfredat raporlarında otomatik olarak görünür.
+                </p>
+                <KazanimPicker
+                  subject={watchAll.subject}
+                  grade={watchAll.grade}
+                  selectedCodes={watchAll.curriculumCodes || []}
+                  onChange={(codes) => setValue('curriculumCodes', codes)}
+                  compact
+                />
               </div>
 
               {/* Source Documents (RAG) */}

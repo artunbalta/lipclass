@@ -1,18 +1,32 @@
+// Mobile generation client — mirrors the web's two-phase pipeline:
+//   PHASE 1: generateSlidesOnly() — fast LLM call, ~10s, saves slides_data
+//            and sets status='slides_ready'.
+//   PHASE 2: finalizeVideoServer() — POSTs to web's /api/videos/[id]/finalize.
+//            Heavy work (TTS + lipsync + Manim + Bunny) runs on the server,
+//            mobile subscribes to Supabase Realtime for progress.
+//
+// Replaces the old monolithic generateVideo() — kept as a deprecated alias
+// pointing at the new server-side flow so existing screens still compile.
+
 import { updateVideo } from './videos';
-import type { SlidesData } from '@/types';
+import type { Slide, SlidesData } from '@/types';
+import { supabase } from '../supabase/client';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? '';
 
 export type GenerationProgress =
   | { stage: 'idle' }
   | { stage: 'generating_slides'; progress: number }
+  | { stage: 'queued'; progress: number }
   | { stage: 'creating_audio'; progress: number; currentSlide?: number; totalSlides?: number }
   | { stage: 'creating_lipsync'; progress: number; currentSlide?: number; totalSlides?: number }
+  | { stage: 'creating_animations'; progress: number }
+  | { stage: 'ingesting_bunny'; progress: number }
   | { stage: 'saving'; progress: number }
   | { stage: 'completed' }
   | { stage: 'failed'; error: string };
 
-export interface GenerationOptions {
+export interface GenerateSlidesOptions {
   videoId: string;
   teacherId: string;
   topic: string;
@@ -23,9 +37,16 @@ export interface GenerationOptions {
   includesProblemSolving?: boolean;
   problemCount?: number;
   difficulty?: string;
-  referenceVideoUrl?: string;
   sourceOnly?: boolean;
   sourceDocumentIds?: string[];
+  onProgress?: (progress: GenerationProgress) => void;
+}
+
+export interface FinalizeOptions {
+  videoId: string;
+  referenceVideoUrl?: string;
+  /** Defaults to true (only re-run dirty slides). */
+  incremental?: boolean;
   onProgress?: (progress: GenerationProgress) => void;
 }
 
@@ -37,7 +58,11 @@ async function apiPost(body: object): Promise<Response> {
   });
 }
 
-export async function generateVideo(options: GenerationOptions): Promise<SlidesData> {
+// ─────────────────────────────────────────────────────────────────────────────
+// PHASE 1 — generate slides only
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function generateSlidesOnly(options: GenerateSlidesOptions): Promise<SlidesData> {
   const {
     videoId,
     teacherId,
@@ -49,19 +74,17 @@ export async function generateVideo(options: GenerationOptions): Promise<SlidesD
     includesProblemSolving = false,
     problemCount,
     difficulty,
-    referenceVideoUrl,
     sourceOnly,
     sourceDocumentIds,
     onProgress,
   } = options;
 
   try {
-    await updateVideo(videoId, { status: 'processing' } as any);
+    onProgress?.({ stage: 'generating_slides', progress: 5 });
 
     // Optional RAG context retrieval
     let ragContext: string | undefined;
     if (sourceDocumentIds && sourceDocumentIds.length > 0) {
-      onProgress?.({ stage: 'generating_slides', progress: 1 });
       try {
         const ragRes = await apiPost({
           step: 'rag_retrieve',
@@ -78,8 +101,7 @@ export async function generateVideo(options: GenerationOptions): Promise<SlidesD
       }
     }
 
-    // Stage 1 — Generate slides
-    onProgress?.({ stage: 'generating_slides', progress: 5 });
+    onProgress?.({ stage: 'generating_slides', progress: 20 });
 
     const slidesRes = await apiPost({
       step: 'slides',
@@ -93,99 +115,172 @@ export async function generateVideo(options: GenerationOptions): Promise<SlidesD
       difficulty,
       ragContext,
       sourceOnly,
+      teacherId,
+      documentIds: sourceDocumentIds,
     });
 
     if (!slidesRes.ok) {
-      const err = await slidesRes.text();
-      throw new Error(err || 'Slayt oluşturma başarısız');
+      const err = await slidesRes.json().catch(() => ({}));
+      throw new Error(err?.error || 'Slayt içeriği oluşturulamadı');
     }
 
-    const slidesData: SlidesData = await slidesRes.json();
-    onProgress?.({ stage: 'creating_audio', progress: 10, totalSlides: slidesData.slides.length });
+    const { slides, contentHash } = (await slidesRes.json()) as {
+      slides: Slide[];
+      contentHash?: string;
+      cached?: boolean;
+    };
+    if (!slides || slides.length === 0) throw new Error('LLM slayt üretemedi');
 
-    // Stage 2 — TTS per slide
-    const slidesWithAudio = [];
-    for (let i = 0; i < slidesData.slides.length; i++) {
-      const slide = slidesData.slides[i];
-      onProgress?.({
-        stage: 'creating_audio',
-        progress: 10 + Math.round((i / slidesData.slides.length) * 40),
-        currentSlide: i + 1,
-        totalSlides: slidesData.slides.length,
-      });
+    const slidesData: SlidesData = { slides };
 
-      try {
-        const audioRes = await apiPost({
-          step: 'tts',
-          videoId,
-          slideIndex: i,
-          narrationText: slide.narrationText,
-          language,
-        });
-        if (audioRes.ok) {
-          const audioData = await audioRes.json();
-          slidesWithAudio.push({ ...slide, audioUrl: audioData.audioUrl });
-        } else {
-          slidesWithAudio.push(slide);
-        }
-      } catch {
-        slidesWithAudio.push(slide);
-      }
-    }
-
-    // Stage 3 — Lipsync (if reference video)
-    const finalSlides = [];
-    if (referenceVideoUrl) {
-      onProgress?.({ stage: 'creating_lipsync', progress: 50, totalSlides: slidesWithAudio.length });
-
-      for (let i = 0; i < slidesWithAudio.length; i++) {
-        const slide = slidesWithAudio[i];
-        onProgress?.({
-          stage: 'creating_lipsync',
-          progress: 50 + Math.round((i / slidesWithAudio.length) * 40),
-          currentSlide: i + 1,
-          totalSlides: slidesWithAudio.length,
-        });
-
-        if (slide.audioUrl) {
-          try {
-            const lipRes = await apiPost({
-              step: 'lipsync',
-              videoId,
-              slideIndex: i,
-              audioUrl: slide.audioUrl,
-              referenceVideoUrl,
-            });
-            if (lipRes.ok) {
-              const lipData = await lipRes.json();
-              finalSlides.push({ ...slide, videoUrl: lipData.videoUrl, bunnyEmbedUrl: lipData.bunnyEmbedUrl });
-              continue;
-            }
-          } catch {
-            // Fall through
-          }
-        }
-        finalSlides.push(slide);
-      }
-    } else {
-      finalSlides.push(...slidesWithAudio);
-    }
-
-    // Stage 4 — Save
-    onProgress?.({ stage: 'saving', progress: 92 });
-
-    const finalSlidesData: SlidesData = { slides: finalSlides };
     await updateVideo(videoId, {
-      slidesData: finalSlidesData,
-      status: 'published',
+      slidesData,
+      status: 'slides_ready',
+      contentHash,
     } as any);
 
+    onProgress?.({ stage: 'generating_slides', progress: 100 });
     onProgress?.({ stage: 'completed' });
-    return finalSlidesData;
+    return slidesData;
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Bilinmeyen hata';
-    await updateVideo(videoId, { status: 'failed' } as any).catch(() => {});
+    try {
+      await updateVideo(videoId, { status: 'failed' } as any);
+    } catch {
+      // ignore
+    }
     onProgress?.({ stage: 'failed', error: msg });
     throw error;
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PHASE 2 — server-side finalize + Realtime progress
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface ServerProgressRow {
+  stage: GenerationProgress['stage'];
+  progress: number;
+  currentSlide?: number;
+  totalSlides?: number;
+  error?: string;
+  updatedAt?: string;
+}
+
+/**
+ * Kick off server-side finalize and return a `cleanup` function that the
+ * caller must invoke when they're done listening (or when their screen
+ * unmounts) to remove the Realtime channel.
+ */
+export async function finalizeVideoServer(
+  options: FinalizeOptions
+): Promise<{ cleanup: () => void }> {
+  const { videoId, referenceVideoUrl, incremental = true, onProgress } = options;
+
+  const channel = supabase
+    .channel(`video-${videoId}-finalize`)
+    .on(
+      // @ts-expect-error supabase-js typing for postgres_changes is loose in RN
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'videos', filter: `id=eq.${videoId}` },
+      (payload: { new: Record<string, unknown> }) => {
+        const newRow = payload.new as { generation_progress?: ServerProgressRow | null; status?: string };
+        if (newRow.generation_progress) {
+          const p = newRow.generation_progress;
+          onProgress?.({
+            stage: p.stage,
+            progress: p.progress,
+            currentSlide: p.currentSlide,
+            totalSlides: p.totalSlides,
+            ...(p.error ? { error: p.error } : {}),
+          } as GenerationProgress);
+        }
+        if (newRow.status === 'published') {
+          onProgress?.({ stage: 'completed' });
+        }
+      }
+    )
+    .subscribe();
+
+  const cleanup = () => {
+    supabase.removeChannel(channel);
+  };
+
+  try {
+    const resp = await fetch(`${API_BASE}/api/videos/${videoId}/finalize`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ referenceVideoUrl, incremental }),
+    });
+
+    if (!resp.ok && resp.status !== 202) {
+      const err = await resp.json().catch(() => ({}));
+      cleanup();
+      throw new Error(err?.error || 'Finalize başlatılamadı');
+    }
+  } catch (err) {
+    cleanup();
+    throw err;
+  }
+
+  return { cleanup };
+}
+
+/**
+ * Subscribe to a video's progress without kicking off finalize. Useful when
+ * mobile re-opens a video that's already being processed elsewhere.
+ */
+export function subscribeProgress(
+  videoId: string,
+  onProgress: (p: GenerationProgress) => void
+): () => void {
+  const channel = supabase
+    .channel(`video-${videoId}-watch`)
+    .on(
+      // @ts-expect-error supabase-js typing for postgres_changes is loose in RN
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'videos', filter: `id=eq.${videoId}` },
+      (payload: { new: Record<string, unknown> }) => {
+        const newRow = payload.new as { generation_progress?: ServerProgressRow | null; status?: string };
+        if (newRow.generation_progress) {
+          onProgress(newRow.generation_progress as GenerationProgress);
+        }
+        if (newRow.status === 'published') {
+          onProgress({ stage: 'completed' });
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Deprecated: one-shot pipeline. Now does slides → server finalize on behalf.
+// Kept so older screens (e.g. mobile/app/(teacher)/create.tsx) still compile.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface GenerationOptions extends GenerateSlidesOptions {
+  referenceVideoUrl?: string;
+}
+
+export async function generateVideo(options: GenerationOptions): Promise<SlidesData> {
+  const slides = await generateSlidesOnly(options);
+
+  const { cleanup } = await finalizeVideoServer({
+    videoId: options.videoId,
+    referenceVideoUrl: options.referenceVideoUrl,
+    incremental: true,
+    onProgress: (p) => {
+      options.onProgress?.(p);
+      if (p.stage === 'completed' || p.stage === 'failed') {
+        // Stop listening once we hit a terminal state
+        setTimeout(cleanup, 100);
+      }
+    },
+  });
+
+  return slides;
 }

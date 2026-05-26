@@ -9,19 +9,21 @@ const initialStats: VideoStats = {
   studentCount: 0,
 };
 
+type VideoFilter = 'all' | 'published' | 'draft' | 'slides_ready' | 'processing';
+
 interface VideoState {
   videos: Video[];
   stats: VideoStats;
   isLoading: boolean;
   selectedVideo: Video | null;
-  filter: 'all' | 'published' | 'draft' | 'processing';
-  
+  filter: VideoFilter;
+
   // Actions
   fetchVideos: () => Promise<void>;
   fetchVideoById: (id: string) => Promise<Video | null>;
   createVideo: (data: CreateVideoFormData) => Promise<Video>;
   deleteVideo: (id: string) => Promise<void>;
-  setFilter: (filter: 'all' | 'published' | 'draft' | 'processing') => void;
+  setFilter: (filter: VideoFilter) => void;
   getFilteredVideos: () => Video[];
 }
 
@@ -45,10 +47,12 @@ export const useVideoStore = create<VideoState>((set, get) => ({
       }
 
       const currentFilter = get().filter;
-      const filters = user.role === 'teacher' 
-        ? { 
-            teacherId: user.id, 
-            status: currentFilter !== 'all' ? (currentFilter as 'published' | 'draft' | 'processing' | 'failed') : undefined 
+      const filters = user.role === 'teacher'
+        ? {
+            teacherId: user.id,
+            status: currentFilter !== 'all'
+              ? (currentFilter as 'published' | 'draft' | 'slides_ready' | 'processing' | 'failed')
+              : undefined,
           }
         : { status: 'published' as const };
       

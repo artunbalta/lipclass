@@ -22,52 +22,147 @@ interface SlideRendererProps {
   slide: Slide;
   isPlaying?: boolean;
   className?: string;
+  /**
+   * When set, quiz answers are POSTed to /api/quiz-attempts for analytics.
+   * Omit (e.g. in the editor preview) to disable logging.
+   */
+  videoId?: string;
 }
 
+/**
+ * Escape HTML special chars in plain (non-math, non-HTML) text spans.
+ * Used to keep narration text from injecting markup. We do NOT escape inside
+ * KaTeX/Mermaid output (KaTeX produces trusted SVG/HTML; Mermaid is rendered
+ * via its own pipeline that already produces SVG).
+ */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/**
+ * Conservative inline-math detector. We avoid matching:
+ *   - Currency-like patterns ($50, 50$, $TR — no math content)
+ *   - Unpaired $ at end of text
+ *   - $ followed by whitespace (not a math opener)
+ *
+ * Rules implemented:
+ *   - Block formulas $$...$$ first (greedy across newlines)
+ *   - Then inline $...$ where contents:
+ *       - don't start/end with a space
+ *       - are 1..200 chars
+ *       - contain at least one of: letter, backslash (\), or math op (=+-/*^_)
+ *   - Otherwise the $ is treated as literal currency/text
+ */
 function renderMathInText(text: string): string {
-  let result = text.replace(/\$\$([\s\S]*?)\$\$/g, (_match, math) => {
+  const PLACEHOLDER = '\x00MATH\x00';
+  const replacements: string[] = [];
+
+  const pushReplacement = (html: string): string => {
+    replacements.push(html);
+    return `${PLACEHOLDER}${replacements.length - 1}${PLACEHOLDER}`;
+  };
+
+  // 1) Block formulas $$...$$
+  let working = text.replace(/\$\$([\s\S]*?)\$\$/g, (_m, math: string) => {
+    let html: string;
     try {
-      return `<div class="slide-math-block">${katex.renderToString(math.trim(), {
+      html = `<div class="slide-math-block">${katex.renderToString(math.trim(), {
         displayMode: true,
         throwOnError: false,
         trust: true,
       })}</div>`;
     } catch {
-      return `<div class="slide-math-block slide-math-error">${math}</div>`;
+      html = `<div class="slide-math-block slide-math-error">${escapeHtml(math)}</div>`;
     }
+    return pushReplacement(html);
   });
 
-  result = result.replace(/\$([^$\n]+?)\$/g, (_match, math) => {
+  // 2) Inline formulas $...$ — only when content looks math-like (allow newlines
+  //    inside up to a soft limit; currency $50 / 50$ stays literal because there
+  //    is no closing dollar with proper math contents nearby).
+  const INLINE_MATH_RE = /\$([^\s$][^$]{0,198}[^\s$]|[^\s$])\$/g;
+  working = working.replace(INLINE_MATH_RE, (match, math: string) => {
+    // Heuristic: at least one letter, backslash, or math operator inside
+    if (!/[A-Za-z\\=+\-/*^_<>]/.test(math)) {
+      // Pure number or symbol — treat as currency / literal
+      return match;
+    }
+    let html: string;
     try {
-      return katex.renderToString(math.trim(), {
+      html = katex.renderToString(math.trim(), {
         displayMode: false,
         throwOnError: false,
         trust: true,
       });
     } catch {
-      return `<span class="slide-math-error">${math}</span>`;
+      html = `<span class="slide-math-error">${escapeHtml(math)}</span>`;
     }
+    return pushReplacement(html);
   });
 
-  result = result.replace(/\n/g, '<br/>');
-  return result;
+  // 3) Escape the rest of the text (now safe to do, no math tokens left)
+  let safe = escapeHtml(working);
+
+  // 4) Restore math placeholders
+  safe = safe.replace(new RegExp(`${PLACEHOLDER}(\\d+)${PLACEHOLDER}`, 'g'), (_m, idx) => {
+    return replacements[Number(idx)] ?? '';
+  });
+
+  // 5) Newlines → <br/>
+  return safe.replace(/\n/g, '<br/>');
 }
 
 function processMermaidBlocks(text: string): { html: string; mermaidBlocks: string[] } {
   const mermaidBlocks: string[] = [];
+  const PRE_PLACEHOLDER = '\x01HTML\x01';
+  const preHtml: string[] = [];
 
-  const processed = text.replace(/```mermaid\s*\n?([\s\S]*?)```/g, (_match, code) => {
+  // 1) Replace mermaid code-fences with a placeholder marker that survives
+  //    escaping (it will be replaced with a real div post-render).
+  let processed = text.replace(/```mermaid\s*\n?([\s\S]*?)```/g, (_match, code) => {
     const idx = mermaidBlocks.length;
     mermaidBlocks.push(code.trim());
-    return `<div class="mermaid-placeholder" data-mermaid-idx="${idx}"></div>`;
+    // Use a marker that renderMathInText's escaper will produce verbatim,
+    // then we post-replace it with the placeholder div.
+    return `${PRE_PLACEHOLDER}MERMAID${idx}${PRE_PLACEHOLDER}`;
   });
 
-  const withImages = processed.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_match, alt, src) => {
-    return `<img src="${src}" alt="${alt}" class="slide-image my-4 rounded-lg shadow-md max-h-64 object-contain mx-auto" />`;
+  // 2) Markdown images → store the safe HTML and reference by index.
+  processed = processed.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_match, alt: string, src: string) => {
+    // Basic URL allowlist — only http(s)/data URLs to prevent javascript:
+    if (!/^(https?:|data:image\/)/i.test(src.trim())) {
+      return ''; // drop unsafe sources
+    }
+    const safeAlt = alt.replace(/"/g, '&quot;');
+    const safeSrc = src.replace(/"/g, '&quot;');
+    const html = `<img src="${safeSrc}" alt="${safeAlt}" class="slide-image my-4 rounded-lg shadow-md max-h-64 object-contain mx-auto" />`;
+    const idx = preHtml.length;
+    preHtml.push(html);
+    return `${PRE_PLACEHOLDER}IMG${idx}${PRE_PLACEHOLDER}`;
   });
 
-  const html = renderMathInText(withImages);
-  return { html, mermaidBlocks };
+  // 3) Render math + escape the rest
+  let rendered = renderMathInText(processed);
+
+  // 4) Restore image placeholders (they were escaped to &#1;IMG…&#1; — we
+  //    need to look for both raw and escaped variants).
+  const restore = (input: string): string => {
+    return input.replace(
+      /(?:\x01|&#1;)HTML(?:\x01|&#1;)(IMG|MERMAID)(\d+)(?:\x01|&#1;)HTML(?:\x01|&#1;)/g,
+      (_m, kind: string, idxStr: string) => {
+        const idx = Number(idxStr);
+        if (kind === 'IMG') return preHtml[idx] || '';
+        if (kind === 'MERMAID') return `<div class="mermaid-placeholder" data-mermaid-idx="${idx}"></div>`;
+        return '';
+      }
+    );
+  };
+  rendered = restore(rendered);
+
+  return { html: rendered, mermaidBlocks };
 }
 
 let mermaidCounter = 0;
@@ -165,9 +260,140 @@ function TabBar({ active, hasAnimation, onChange }: TabBarProps) {
 }
 
 // ---------------------------------------------------------------------------
+// Quiz UI (non-blocking)
+// ---------------------------------------------------------------------------
+interface QuizUIProps {
+  slide: Slide;
+  videoId?: string;
+}
+
+function QuizUI({ slide, videoId }: QuizUIProps) {
+  const quiz = slide.quiz;
+  const [selected, setSelected] = useState<number | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<{ isCorrect: boolean; correctAnswer: number; explanation?: string | null } | null>(null);
+
+  // Reset when slide changes
+  useEffect(() => {
+    setSelected(null);
+    setResult(null);
+    setSubmitting(false);
+  }, [slide.slideNumber]);
+
+  if (!quiz) {
+    return (
+      <div className="flex-grow flex items-center justify-center text-sm text-gray-400 italic">
+        Quiz verisi eksik.
+      </div>
+    );
+  }
+
+  const handleSelect = async (idx: number) => {
+    if (result || submitting) return;
+    setSelected(idx);
+    setSubmitting(true);
+
+    // If we're inside a preview (no videoId), grade locally without logging
+    if (!videoId) {
+      setResult({
+        isCorrect: idx === quiz.correctAnswer,
+        correctAnswer: quiz.correctAnswer,
+        explanation: quiz.explanation || null,
+      });
+      setSubmitting(false);
+      return;
+    }
+
+    try {
+      const resp = await fetch('/api/quiz-attempts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoId, slideNumber: slide.slideNumber, selectedOption: idx }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        setResult(data);
+      } else {
+        // Fall back to local grading if API fails
+        setResult({
+          isCorrect: idx === quiz.correctAnswer,
+          correctAnswer: quiz.correctAnswer,
+          explanation: quiz.explanation || null,
+        });
+      }
+    } catch {
+      setResult({
+        isCorrect: idx === quiz.correctAnswer,
+        correctAnswer: quiz.correctAnswer,
+        explanation: quiz.explanation || null,
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="flex-grow flex flex-col">
+      <div className="mb-3 flex items-center gap-2">
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-medium">
+          <span>❓</span> Quiz
+        </span>
+        <span className="text-xs text-gray-400">İstersen atlayabilirsin</span>
+      </div>
+
+      <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4 leading-snug">
+        {quiz.question}
+      </h3>
+
+      <div className="grid gap-2 mb-4">
+        {quiz.options.map((opt, idx) => {
+          const isSelected = selected === idx;
+          const isCorrect = result && idx === result.correctAnswer;
+          const isWrongChoice = result && isSelected && !result.isCorrect;
+
+          let cls = 'border-gray-200 hover:bg-gray-50';
+          if (result) {
+            if (isCorrect) cls = 'border-emerald-500 bg-emerald-50 text-emerald-900';
+            else if (isWrongChoice) cls = 'border-rose-400 bg-rose-50 text-rose-900';
+            else cls = 'border-gray-200 opacity-60';
+          } else if (isSelected) {
+            cls = 'border-indigo-400 bg-indigo-50';
+          }
+
+          return (
+            <button
+              key={idx}
+              onClick={() => handleSelect(idx)}
+              disabled={!!result || submitting}
+              className={`text-left px-4 py-3 rounded-lg border-2 transition-all flex items-center gap-3 text-sm ${cls}`}
+            >
+              <span className="flex items-center justify-center w-7 h-7 rounded-full bg-white border border-gray-300 text-xs font-mono shrink-0">
+                {String.fromCharCode(65 + idx)}
+              </span>
+              <span className="flex-1">{opt}</span>
+              {isCorrect && <span className="text-emerald-600">✓</span>}
+              {isWrongChoice && <span className="text-rose-600">✕</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      {result && result.explanation && (
+        <div className={`mt-2 rounded-lg px-3 py-2 text-xs ${result.isCorrect ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-900'}`}>
+          <strong>{result.isCorrect ? 'Doğru!' : 'Açıklama:'}</strong> {result.explanation}
+        </div>
+      )}
+
+      {/* Spacer to keep content above video overlay area (bottom-left) */}
+      <div className="min-h-[3rem] sm:min-h-[4rem] shrink-0" />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
-export default function SlideRenderer({ slide, isPlaying = false, className = '' }: SlideRendererProps) {
+export default function SlideRenderer({ slide, isPlaying = false, className = '', videoId }: SlideRendererProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const bulletsRef = useRef<HTMLUListElement>(null);
 
@@ -229,6 +455,8 @@ export default function SlideRenderer({ slide, isPlaying = false, className = ''
     }
   }, [slide.bulletPoints]);
 
+  const isQuiz = slide.slideType === 'quiz';
+
   return (
     <div className={`slide-renderer bg-white text-gray-900 rounded-xl p-8 flex flex-col h-full shadow-lg overflow-y-auto ${className}`}>
       {/* Slide number badge + tab switcher */}
@@ -236,11 +464,16 @@ export default function SlideRenderer({ slide, isPlaying = false, className = ''
         <span className="text-xs font-mono text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
           {slide.slideNumber} / 10
         </span>
-        <TabBar active={activeTab} hasAnimation={hasAnimation} onChange={setActiveTab} />
+        {!isQuiz && (
+          <TabBar active={activeTab} hasAnimation={hasAnimation} onChange={setActiveTab} />
+        )}
       </div>
 
+      {/* Quiz slide takes over the body entirely */}
+      {isQuiz && <QuizUI slide={slide} videoId={videoId} />}
+
       {/* Animation tab */}
-      {activeTab === 'animation' && slide.animationUrl && !animationBroken && (
+      {!isQuiz && activeTab === 'animation' && slide.animationUrl && !animationBroken && (
         <div className="flex-grow rounded-xl overflow-hidden" style={{ minHeight: '320px' }}>
           <AnimationPlayer
             animationUrl={slide.animationUrl}
@@ -254,7 +487,7 @@ export default function SlideRenderer({ slide, isPlaying = false, className = ''
       )}
 
       {/* Slide tab (KaTeX / Mermaid) */}
-      {activeTab === 'slide' && (
+      {!isQuiz && activeTab === 'slide' && (
         <>
           {/* Title */}
           <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 leading-tight">

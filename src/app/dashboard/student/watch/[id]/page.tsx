@@ -104,6 +104,7 @@ export default function WatchVideoPage() {
                 slidesData={selectedVideo.slidesData}
                 referenceVideoUrl={refVideoUrl}
                 title={selectedVideo.title}
+                videoId={selectedVideo.id}
               />
             ) : (
               <div className="relative aspect-video rounded-xl overflow-hidden bg-slate-900 flex items-center justify-center">

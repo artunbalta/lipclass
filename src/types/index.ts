@@ -25,6 +25,15 @@ export interface Student extends User {
 }
 
 // Slide Types
+export type SlideType = 'content' | 'quiz';
+
+export interface QuizData {
+  question: string;
+  options: [string, string, string, string]; // exactly 4 options
+  correctAnswer: 0 | 1 | 2 | 3;               // index of correct option
+  explanation?: string;
+}
+
 export interface Slide {
   slideNumber: number;
   title: string;
@@ -36,6 +45,17 @@ export interface Slide {
   animationUrl?: string; // Manim-generated animation video URL for this slide
   bunnyVideoGuid?: string; // Bunny Stream video GUID (when provider=bunny)
   bunnyEmbedUrl?: string; // Bunny Stream embed URL (when provider=bunny)
+
+  // Slide type discriminator. When 'quiz', `quiz` field is required and the
+  // player renders the interactive quiz UI instead of slide content.
+  slideType?: SlideType;
+  quiz?: QuizData;
+
+  // Editor / regen state — set when teacher edits a slide between
+  // slides_ready and the next finalize. Both fields are ISO timestamps.
+  editedAt?: string;          // any field changed manually
+  narrationDirtyAt?: string;  // narration changed → TTS+lipsync must re-run on finalize
+  mediaStatus?: 'pending' | 'ready' | 'failed'; // populated during finalize pipeline
 }
 
 export interface SlidesData {
@@ -57,15 +77,30 @@ export interface Video {
   videoUrl?: string; // Optional - legacy MP4 videos
   slidesData?: SlidesData; // New slide-based content
   duration: number; // seconds (sum of all slide audio durations)
-  status: 'draft' | 'processing' | 'published' | 'failed';
+  status: 'draft' | 'slides_ready' | 'processing' | 'published' | 'failed';
   viewCount: number;
   createdAt: Date;
+  slidesApprovedAt?: Date; // Set when teacher clicks "Onayla ve Üret"
   prompt: string;
   includesProblemSolving: boolean;
   problemCount?: number;
   difficulty?: 'easy' | 'medium' | 'hard';
   videoProvider?: 'fal' | 'bunny';
   bunnyIngestionStatus?: 'pending' | 'success' | 'failed' | null;
+  contentHash?: string;            // sha256 of generation inputs — cache key
+  curriculumCodes?: string[];      // MEB kazanım kodları (e.g. ['8.2.1.1', '8.2.1.2'])
+  parentVideoId?: string;          // If this video is a derivative, points at original
+  variantLabel?: string;           // Human label, e.g. 'İngilizce', 'İlkokul'
+  language?: 'tr' | 'en';          // Stored in DB; used for variant differentiation
+  tone?: 'formal' | 'friendly' | 'energetic';
+  generationProgress?: {
+    stage: string;
+    progress: number;              // 0-100
+    currentSlide?: number;
+    totalSlides?: number;
+    error?: string;
+    updatedAt: string;             // ISO timestamp
+  } | null;
 }
 
 export interface VideoStats {
@@ -90,6 +125,7 @@ export interface CreateVideoFormData {
   difficulty: 'easy' | 'medium' | 'hard';
   estimatedDuration: number;
   language: 'tr' | 'en';
+  curriculumCodes?: string[];
 }
 
 // Testimonial Type

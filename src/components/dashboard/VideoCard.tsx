@@ -42,6 +42,7 @@ interface VideoCardProps {
 
 const statusMap = {
   draft: { label: 'Taslak', color: 'bg-muted text-muted-foreground' },
+  slides_ready: { label: 'Slaytlar hazır', color: 'bg-indigo-500/10 text-indigo-500' },
   processing: { label: 'İşleniyor', color: 'bg-amber-500/10 text-amber-500' },
   published: { label: 'Yayında', color: 'bg-emerald-500/10 text-emerald-500' },
   failed: { label: 'Hata', color: 'bg-destructive/10 text-destructive' },
@@ -59,9 +60,14 @@ export function VideoCard({
   const [imageError, setImageError] = useState(false);
   const status = statusMap[video.status];
 
-  const linkHref = showActions 
-    ? `/dashboard/teacher/videos/${video.id}`
+  // For teachers: route 'slides_ready' videos straight to the editor so they
+  // can review/approve. All other states go to the teacher detail view.
+  const linkHref = showActions
+    ? (video.status === 'slides_ready'
+        ? `/dashboard/teacher/videos/${video.id}/edit`
+        : `/dashboard/teacher/videos/${video.id}`)
     : `/dashboard/student/watch/${video.id}`;
+  const editHref = `/dashboard/teacher/videos/${video.id}/edit`;
 
   if (variant === 'horizontal') {
     return (
@@ -111,9 +117,11 @@ export function VideoCard({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem>
-                    <Edit className="w-4 h-4 mr-2" />
-                    Düzenle
+                  <DropdownMenuItem asChild>
+                    <Link href={editHref}>
+                      <Edit className="w-4 h-4 mr-2" />
+                      Düzenle
+                    </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem>
                     <Share2 className="w-4 h-4 mr-2" />

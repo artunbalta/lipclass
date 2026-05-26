@@ -94,13 +94,14 @@ export default function TeacherVideosPage() {
 
       {/* Filters & Search */}
       <div className="flex flex-col sm:flex-row gap-4">
-        <Tabs 
-          value={filter} 
+        <Tabs
+          value={filter}
           onValueChange={(v) => setFilter(v as typeof filter)}
           className="w-full sm:w-auto"
         >
-          <TabsList className="grid grid-cols-4 w-full sm:w-auto">
+          <TabsList className="grid grid-cols-5 w-full sm:w-auto">
             <TabsTrigger value="all">Tümü</TabsTrigger>
+            <TabsTrigger value="slides_ready">Onay Bekliyor</TabsTrigger>
             <TabsTrigger value="published">Yayında</TabsTrigger>
             <TabsTrigger value="draft">Taslak</TabsTrigger>
             <TabsTrigger value="processing">İşleniyor</TabsTrigger>

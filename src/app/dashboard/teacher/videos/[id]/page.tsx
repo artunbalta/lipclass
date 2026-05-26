@@ -17,12 +17,26 @@ import {
   Users,
   Copy,
   Check,
-  QrCode
+  QrCode,
+  GitBranch,
+  Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { getVideos } from '@/lib/api/videos';
+import type { Video } from '@/types';
 import { useVideoStore } from '@/stores/video-store';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { SlidePlayer } from '@/components/dashboard';
@@ -35,10 +49,22 @@ import { toast } from 'sonner';
 
 const statusMap = {
   draft: { label: 'Taslak', color: 'bg-muted text-muted-foreground' },
+  slides_ready: { label: 'Slaytlar hazır', color: 'bg-indigo-500/10 text-indigo-500' },
   processing: { label: 'İşleniyor', color: 'bg-amber-500/10 text-amber-500' },
   published: { label: 'Yayında', color: 'bg-emerald-500/10 text-emerald-500' },
   failed: { label: 'Hata', color: 'bg-destructive/10 text-destructive' },
 };
+
+interface QuizStat {
+  slideNumber: number;
+  question: string;
+  correctAnswer: number;
+  options: string[];
+  totalAttempts: number;
+  correctCount: number;
+  correctRate: number;
+  optionCounts: [number, number, number, number];
+}
 
 export default function VideoDetailPage() {
   const params = useParams();
@@ -47,6 +73,13 @@ export default function VideoDetailPage() {
   const { user } = useAuthStore();
   const [copied, setCopied] = useState(false);
   const [refVideoUrl, setRefVideoUrl] = useState<string | null>(null);
+  const [quizStats, setQuizStats] = useState<QuizStat[] | null>(null);
+  const [variants, setVariants] = useState<Video[]>([]);
+  const [deriveOpen, setDeriveOpen] = useState(false);
+  const [deriveLanguage, setDeriveLanguage] = useState<'tr' | 'en'>('en');
+  const [deriveTone, setDeriveTone] = useState<'formal' | 'friendly' | 'energetic'>('friendly');
+  const [deriveLabel, setDeriveLabel] = useState('İngilizce');
+  const [deriving, setDeriving] = useState(false);
 
   useEffect(() => {
     if (params.id) {
@@ -65,6 +98,69 @@ export default function VideoDetailPage() {
       });
     }
   }, [user?.id]);
+
+  // Fetch quiz analytics when the video has quiz slides
+  useEffect(() => {
+    if (!selectedVideo?.id) return;
+    const hasQuiz = selectedVideo.slidesData?.slides.some((s) => s.slideType === 'quiz');
+    if (!hasQuiz) {
+      setQuizStats([]);
+      return;
+    }
+    fetch(`/api/teacher/quiz-analytics?videoId=${selectedVideo.id}`)
+      .then((r) => (r.ok ? r.json() : { slides: [] }))
+      .then((data) => setQuizStats(data.slides || []))
+      .catch((err) => {
+        console.warn('[VideoDetail] quiz analytics fetch failed:', err);
+        setQuizStats([]);
+      });
+  }, [selectedVideo?.id, selectedVideo?.slidesData]);
+
+  // Fetch variants — siblings under same parent, or children if we ARE the parent
+  useEffect(() => {
+    if (!selectedVideo?.id || !user?.id) return;
+    (async () => {
+      try {
+        const all = await getVideos({ teacherId: user.id });
+        const rootId = selectedVideo.parentVideoId || selectedVideo.id;
+        const sibs = all.filter(
+          (v: Video) => v.id !== selectedVideo.id && (v.id === rootId || v.parentVideoId === rootId)
+        );
+        setVariants(sibs);
+      } catch (err) {
+        console.warn('[VideoDetail] variants fetch failed:', err);
+      }
+    })();
+  }, [selectedVideo?.id, selectedVideo?.parentVideoId, user?.id]);
+
+  const handleDerive = async () => {
+    if (!selectedVideo) return;
+    const label = deriveLabel.trim();
+    if (!label) {
+      showToast.error('Etiket gerekli', 'Versiyon için kısa bir etiket gir.');
+      return;
+    }
+    setDeriving(true);
+    try {
+      const resp = await fetch(`/api/videos/${selectedVideo.id}/derive`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ language: deriveLanguage, tone: deriveTone, variantLabel: label }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err?.error || 'Türev oluşturulamadı');
+      }
+      const { videoId: newId } = await resp.json();
+      showToast.success('Versiyon oluşturuldu', 'Editör açılıyor.');
+      setDeriveOpen(false);
+      router.push(`/dashboard/teacher/videos/${newId}/edit`);
+    } catch (err) {
+      showToast.error('Hata', err instanceof Error ? err.message : 'Bilinmeyen hata');
+    } finally {
+      setDeriving(false);
+    }
+  };
 
   const [deleteDialog, setDeleteDialog] = useState(false);
 
@@ -118,10 +214,16 @@ export default function VideoDetailPage() {
           </Button>
           <div>
             <h1 className="text-xl lg:text-2xl font-bold">{selectedVideo.title}</h1>
-            <div className="flex items-center gap-2 mt-1">
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
               <Badge className={cn('text-xs', status.color)}>
                 {status.label}
               </Badge>
+              {selectedVideo.variantLabel && (
+                <Badge className="text-xs bg-violet-500/10 text-violet-600 gap-1">
+                  <GitBranch className="w-3 h-3" />
+                  {selectedVideo.variantLabel}
+                </Badge>
+              )}
               <span className="text-sm text-muted-foreground">
                 {formatDate(selectedVideo.createdAt)}
               </span>
@@ -129,9 +231,25 @@ export default function VideoDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => router.push(`/dashboard/teacher/videos/${selectedVideo.id}/edit`)}
+          >
             <Edit className="w-4 h-4" />
             <span className="hidden sm:inline">Düzenle</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => setDeriveOpen(true)}
+            disabled={!selectedVideo.slidesData}
+            title="Bu dersten farklı dil/ton versiyonu oluştur"
+          >
+            <GitBranch className="w-4 h-4" />
+            <span className="hidden sm:inline">Versiyon</span>
           </Button>
           <Button
             variant="outline"
@@ -157,6 +275,7 @@ export default function VideoDetailPage() {
                 slidesData={selectedVideo.slidesData}
                 referenceVideoUrl={refVideoUrl}
                 title={selectedVideo.title}
+                videoId={selectedVideo.id}
               />
             ) : (
               <div className="relative aspect-video rounded-xl overflow-hidden bg-slate-900 flex items-center justify-center">
@@ -220,6 +339,74 @@ export default function VideoDetailPage() {
               </>
             )}
           </div>
+
+          {/* Quiz Analytics */}
+          {quizStats && quizStats.length > 0 && (
+            <div className="p-6 rounded-xl border border-border bg-card">
+              <h3 className="font-semibold mb-1 flex items-center gap-2">
+                ❓ Quiz Analitiği
+              </h3>
+              <p className="text-xs text-muted-foreground mb-4">
+                Her quiz için öğrencilerin cevap dağılımı.
+              </p>
+
+              <div className="space-y-5">
+                {quizStats.map((q) => {
+                  const total = Math.max(q.totalAttempts, 1);
+                  return (
+                    <div key={q.slideNumber} className="rounded-lg border border-border p-4">
+                      <div className="flex items-center justify-between gap-2 mb-3">
+                        <p className="text-sm font-medium line-clamp-2">
+                          <span className="text-muted-foreground mr-1">#{q.slideNumber}</span>
+                          {q.question || 'Soru metni boş'}
+                        </p>
+                        <Badge className={cn(
+                          'text-xs shrink-0',
+                          q.correctRate >= 80 ? 'bg-emerald-500/10 text-emerald-600'
+                            : q.correctRate >= 50 ? 'bg-amber-500/10 text-amber-600'
+                            : 'bg-rose-500/10 text-rose-600'
+                        )}>
+                          %{q.correctRate} doğru
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        {q.totalAttempts} cevap • {q.correctCount} doğru
+                      </p>
+                      <div className="space-y-1.5">
+                        {q.options.map((opt, i) => {
+                          const count = q.optionCounts[i] || 0;
+                          const pct = Math.round((count / total) * 100);
+                          const isCorrect = i === q.correctAnswer;
+                          return (
+                            <div key={i} className="flex items-center gap-2 text-xs">
+                              <span className={cn(
+                                'w-5 h-5 flex items-center justify-center rounded font-mono shrink-0',
+                                isCorrect ? 'bg-emerald-500/20 text-emerald-700' : 'bg-muted text-muted-foreground'
+                              )}>
+                                {String.fromCharCode(65 + i)}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex justify-between mb-0.5">
+                                  <span className="truncate">{opt || '—'}</span>
+                                  <span className="text-muted-foreground ml-2">{count}</span>
+                                </div>
+                                <div className="h-1 bg-muted rounded-full overflow-hidden">
+                                  <div
+                                    className={cn('h-full rounded-full', isCorrect ? 'bg-emerald-500' : 'bg-gray-400')}
+                                    style={{ width: `${pct}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Sidebar */}
@@ -254,6 +441,45 @@ export default function VideoDetailPage() {
                 Videoyu İndir
               </Button>
             </div>
+          </motion.div>
+
+          {/* Versions Card */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.05 }}
+            className="p-6 rounded-xl border border-border bg-card"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold flex items-center gap-2">
+                <GitBranch className="w-4 h-4" /> Versiyonlar
+              </h3>
+              <Button size="sm" variant="outline" onClick={() => setDeriveOpen(true)} disabled={!selectedVideo.slidesData}>
+                + Yeni
+              </Button>
+            </div>
+            {variants.length === 0 ? (
+              <p className="text-xs text-muted-foreground italic">
+                Bu dersin başka versiyonu yok. Farklı dil/ton ile türev oluşturabilirsin.
+              </p>
+            ) : (
+              <ul className="space-y-1.5">
+                {variants.map((v) => (
+                  <li key={v.id}>
+                    <Link
+                      href={`/dashboard/teacher/videos/${v.id}`}
+                      className="flex items-center gap-2 text-xs hover:bg-muted/50 rounded-md p-2 transition-colors"
+                    >
+                      <Badge className="text-[10px] bg-violet-500/10 text-violet-600 shrink-0">
+                        {v.variantLabel || (v.id === selectedVideo.parentVideoId ? 'Orijinal' : 'Versiyon')}
+                      </Badge>
+                      <span className="flex-1 truncate">{v.title}</span>
+                      <span className="text-[10px] text-muted-foreground">{v.language?.toUpperCase()}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
           </motion.div>
 
           {/* Stats Card */}
@@ -310,6 +536,91 @@ export default function VideoDetailPage() {
         cancelText="İptal"
         variant="destructive"
       />
+
+      {/* Derive Dialog */}
+      <Dialog open={deriveOpen} onOpenChange={setDeriveOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Versiyon Oluştur</DialogTitle>
+            <DialogDescription>
+              Aynı slayt yapısından farklı bir dil/ton versiyonu üret. Slaytlar kopyalanır;
+              ses ve video versiyon onaylandığında yeniden üretilir.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Etiket</Label>
+              <Input
+                value={deriveLabel}
+                onChange={(e) => setDeriveLabel(e.target.value)}
+                placeholder="Örn: İngilizce, İlkokul seviyesi, Resmi ton..."
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Bu etiket video kartında ve listede gösterilir.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Dil</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={deriveLanguage === 'tr' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setDeriveLanguage('tr')}
+                >
+                  🇹🇷 Türkçe
+                </Button>
+                <Button
+                  type="button"
+                  variant={deriveLanguage === 'en' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setDeriveLanguage('en')}
+                >
+                  🇬🇧 English
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Ton</Label>
+              <div className="flex gap-2">
+                {([
+                  { value: 'formal', label: 'Resmi' },
+                  { value: 'friendly', label: 'Samimi' },
+                  { value: 'energetic', label: 'Enerjik' },
+                ] as const).map((t) => (
+                  <Button
+                    key={t.value}
+                    type="button"
+                    variant={deriveTone === t.value ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setDeriveTone(t.value)}
+                  >
+                    {t.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900">
+              💡 Versiyon "slides_ready" durumunda oluşacak. Anlatımı yeni dile çevirip
+              kaydet, sonra "Onayla ve Üret" ile sesi/lipsync'i üret.
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeriveOpen(false)} disabled={deriving}>
+              İptal
+            </Button>
+            <Button onClick={handleDerive} disabled={deriving} className="gap-2">
+              {deriving ? <Loader2 className="w-4 h-4 animate-spin" /> : <GitBranch className="w-4 h-4" />}
+              Versiyon Oluştur
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
