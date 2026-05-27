@@ -9,7 +9,10 @@ import {
   Palette,
   Save,
   Camera,
-  Loader2
+  Loader2,
+  Accessibility,
+  Users,
+  Check,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -128,10 +131,57 @@ export default function StudentSettingsPage() {
     setNotifications(prev => ({ ...prev, [id]: !prev[id as keyof typeof prev] }));
   };
 
+  // Classroom join state
+  const [joinCode, setJoinCode] = useState('');
+  const [joinLoading, setJoinLoading] = useState(false);
+  const [joinedClassrooms, setJoinedClassrooms] = useState<Array<{ id: string; name: string }>>([]);
+
+  const handleJoinClass = async () => {
+    if (!joinCode.trim()) return;
+    setJoinLoading(true);
+    try {
+      const res = await fetch('/api/classrooms/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: joinCode.trim() }),
+      });
+      const d = await res.json();
+      if (res.ok) {
+        showToast.success('Sınıfa katıldın!', d.classroom.name);
+        setJoinedClassrooms(prev => [...prev, d.classroom]);
+        setJoinCode('');
+      } else {
+        showToast.error('Hata', d.error ?? 'Kod geçersiz.');
+      }
+    } catch {
+      showToast.error('Bağlantı hatası', 'Tekrar deneyin.');
+    } finally {
+      setJoinLoading(false);
+    }
+  };
+
+  const [dyslexicFont, setDyslexicFont] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('dyslexic-font') === 'true';
+    }
+    return false;
+  });
+
+  const toggleDyslexicFont = () => {
+    const next = !dyslexicFont;
+    setDyslexicFont(next);
+    if (typeof document !== 'undefined') {
+      document.documentElement.classList.toggle('font-dyslexic', next);
+      localStorage.setItem('dyslexic-font', String(next));
+    }
+  };
+
   const tabs = [
     { id: 'profile', label: 'Profil', icon: User },
+    { id: 'classroom', label: 'Sınıfım', icon: Users },
     { id: 'notifications', label: 'Bildirimler', icon: Bell },
     { id: 'security', label: 'Güvenlik', icon: Shield },
+    { id: 'accessibility', label: 'Erişilebilirlik', icon: Accessibility },
   ];
 
   return (
@@ -306,6 +356,54 @@ export default function StudentSettingsPage() {
         </motion.div>
       )}
 
+      {/* Classroom Tab */}
+      {activeTab === 'classroom' && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-6"
+        >
+          <div className="p-6 rounded-xl border border-border bg-card space-y-5">
+            <div>
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Users className="w-5 h-5 text-primary" />
+                Sınıfa Katıl
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Öğretmeninden aldığın 6 haneli kodu girerek sınıfa katıl.
+              </p>
+            </div>
+            <div className="flex gap-3 max-w-sm">
+              <Input
+                placeholder="Sınıf kodu (ör. AB12CD)"
+                value={joinCode}
+                onChange={e => setJoinCode(e.target.value.toUpperCase())}
+                maxLength={6}
+                className="font-mono tracking-widest text-center text-lg"
+                onKeyDown={e => e.key === 'Enter' && handleJoinClass()}
+              />
+              <Button onClick={handleJoinClass} disabled={joinLoading || joinCode.length !== 6} className="gap-2 shrink-0">
+                {joinLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                Katıl
+              </Button>
+            </div>
+            {joinedClassrooms.length > 0 && (
+              <div className="pt-3 border-t border-border">
+                <p className="text-xs font-medium text-muted-foreground mb-2">Bu oturumda katıldıkların:</p>
+                <div className="flex flex-wrap gap-2">
+                  {joinedClassrooms.map(c => (
+                    <span key={c.id} className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700 text-sm font-medium">
+                      <Check className="w-3 h-3" />
+                      {c.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
+
       {/* Notifications Tab */}
       {activeTab === 'notifications' && (
         <motion.div
@@ -395,6 +493,65 @@ export default function StudentSettingsPage() {
         </motion.div>
       )}
 
+      {activeTab === 'accessibility' && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-6"
+        >
+          <div className="p-6 rounded-xl border border-border bg-card space-y-4">
+            <h3 className="font-semibold flex items-center gap-2">
+              <Accessibility className="w-5 h-5 text-primary" />
+              Okuma Erişilebilirliği
+            </h3>
+
+            {/* Dyslexic font toggle */}
+            <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
+              <div>
+                <p className="font-medium text-sm">Disleksi Dostu Font</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Okumayı kolaylaştıran geniş aralıklı font ve satır yüksekliği. Tercihiniz kaydedilir.
+                </p>
+                {dyslexicFont && (
+                  <p className="text-xs text-primary mt-1">✓ Şu an aktif</p>
+                )}
+              </div>
+              <button
+                onClick={toggleDyslexicFont}
+                className={cn(
+                  'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none',
+                  dyslexicFont ? 'bg-primary' : 'bg-muted-foreground/30'
+                )}
+              >
+                <span
+                  className={cn(
+                    'inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform',
+                    dyslexicFont ? 'translate-x-5' : 'translate-x-0'
+                  )}
+                />
+              </button>
+            </div>
+
+            {/* CC note */}
+            <div className="p-4 rounded-lg bg-muted/50">
+              <p className="font-medium text-sm">Altyazı (CC)</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Video oynatıcısındaki <span className="font-mono bg-muted px-1 rounded">CC</span> butonuyla
+                her slayt için anlatım metni altyazı olarak gösterilebilir.
+              </p>
+            </div>
+
+            {/* Sign language note */}
+            <div className="p-4 rounded-lg bg-muted/50">
+              <p className="font-medium text-sm flex items-center gap-1.5">🤟 Türk İşaret Dili (TİD)</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Video oynatıcısındaki işaret dili butonu şu anda yer tutucu gösteriyor.
+                Gerçek TİD animasyon desteği yakında eklenecek.
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
     </div>
   );

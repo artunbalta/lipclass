@@ -13,7 +13,7 @@
 //   persistSlideEdits()  — save edits to slides_data JSONB
 
 import { updateVideo, saveSlidesData } from './videos';
-import type { Slide, SlidesData } from '@/types';
+import type { Slide, SlideOutline, SlidesData } from '@/types';
 
 export type GenerationProgress =
   | { stage: 'idle' }
@@ -149,6 +149,102 @@ export async function generateSlidesOnly(options: GenerateSlidesOptions): Promis
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PHASE 1 (streaming variant) — generateSlidesStream()
+// Uses /api/generate-slides-stream (SSE) so slides appear one by one.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function generateSlidesStream(
+  options: GenerateSlidesOptions & {
+    onSlide?: (slide: Slide, index: number, total: number) => void;
+    /** Pass 1 outline arrived — UI can render skeleton with role badges. */
+    onOutline?: (outline: SlideOutline[]) => void;
+  }
+): Promise<SlidesData> {
+  const {
+    videoId, teacherId, topic, description, prompt,
+    language = 'tr', tone = 'friendly',
+    includesProblemSolving = false, problemCount, difficulty,
+    sourceOnly, sourceDocumentIds,
+    onProgress, onSlide, onOutline,
+  } = options;
+
+  return new Promise((resolve, reject) => {
+    const slides: Slide[] = [];
+    let outline: SlideOutline[] | undefined;
+    let totalExpected = 0;
+
+    fetch('/api/generate-slides-stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        videoId, teacherId, topic, description, prompt,
+        language, tone, includesProblemSolving, problemCount, difficulty,
+        sourceOnly, sourceDocumentIds,
+      }),
+    }).then(async (response) => {
+      if (!response.ok || !response.body) {
+        const text = await response.text().catch(() => 'Unknown error');
+        reject(new Error(text));
+        return;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop() ?? '';
+
+        for (const part of parts) {
+          const line = part.replace(/^data: /, '').trim();
+          if (!line) continue;
+          let event: Record<string, unknown>;
+          try { event = JSON.parse(line); } catch { continue; }
+
+          if (event.type === 'progress') {
+            onProgress?.({
+              stage: 'generating_slides',
+              progress: (event.progress as number) ?? 50,
+            });
+          } else if (event.type === 'outline') {
+            outline = event.outline as SlideOutline[];
+            totalExpected = outline?.length || 0;
+            onOutline?.(outline);
+          } else if (event.type === 'slide') {
+            const slide = event.slide as Slide;
+            slides.push(slide);
+            onSlide?.(slide, event.index as number, event.total as number);
+            const total = (event.total as number) || totalExpected || slides.length;
+            onProgress?.({
+              stage: 'generating_slides',
+              progress: Math.round((slides.length / total) * 90),
+            });
+          } else if (event.type === 'done') {
+            onProgress?.({ stage: 'completed' });
+            resolve({ slides, outline });
+          } else if (event.type === 'error') {
+            reject(new Error(event.message as string));
+          }
+        }
+      }
+
+      // Fallback: if stream ends without 'done' event
+      if (slides.length > 0) {
+        onProgress?.({ stage: 'completed' });
+        resolve({ slides, outline });
+      } else {
+        reject(new Error('Stream ended without slides'));
+      }
+    }).catch(reject);
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // PHASE 2 was here; finalize is now server-side at /api/videos/[id]/finalize
 // → /lib/llm/finalize.ts. The editor POSTs to that endpoint and subscribes
 // to videos.generation_progress via Supabase Realtime for live updates.
@@ -236,6 +332,73 @@ export async function regenerateSlide(input: {
  */
 export async function persistSlideEdits(videoId: string, slidesData: SlidesData) {
   return saveSlidesData(videoId, slidesData);
+}
+
+/**
+ * Extract lesson content from a whiteboard/handwritten notes image.
+ * imageUrl should be a data URL (base64) or a public HTTPS URL.
+ */
+export async function extractWhiteboardContent(imageUrl: string): Promise<{
+  topic?: string;
+  description?: string;
+  formulas?: string[];
+}> {
+  const resp = await fetch('/api/generate-video', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ step: 'whiteboard_extract', image_url: imageUrl }),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Tahta içeriği çıkarılamadı');
+  }
+
+  const { extracted } = (await resp.json()) as { extracted: { topic?: string; description?: string; formulas?: string[] } };
+  return extracted || {};
+}
+
+/**
+ * Parse a free-form spoken transcript into structured lesson form fields.
+ *
+ * Throws with a *descriptive* message so the caller can show it to the user
+ * directly (don't wrap in a generic "Komut hatası" — that hides the root cause).
+ */
+export async function parseVoiceCommand(transcript: string): Promise<{
+  subject?: string;
+  grade?: string;
+  topic?: string;
+  description?: string;
+  tone?: 'formal' | 'friendly' | 'energetic';
+}> {
+  const clean = (transcript || '').trim();
+  if (!clean) {
+    throw new Error('Transkript boş — mikrofon konuşmanı algılayamadı.');
+  }
+
+  let resp: Response;
+  try {
+    resp = await fetch('/api/generate-video', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ step: 'voice_parse', transcript: clean }),
+    });
+  } catch (e) {
+    throw new Error(`İnternet bağlantısı sorunu: ${e instanceof Error ? e.message : 'fetch failed'}`);
+  }
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    const detail = (err as { error?: string }).error;
+    throw new Error(
+      detail || `Sunucu hatası (${resp.status}). Lütfen biraz sonra tekrar dene.`
+    );
+  }
+
+  const payload = (await resp.json().catch(() => ({}))) as {
+    parsed?: { subject?: string; grade?: string; topic?: string; description?: string; tone?: 'formal' | 'friendly' | 'energetic' };
+  };
+  return payload.parsed || {};
 }
 
 /**

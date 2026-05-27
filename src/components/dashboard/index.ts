@@ -4,3 +4,4 @@ export { StatsCard } from './StatsCard';
 export { VideoCard } from './VideoCard';
 export { default as SlidePlayer } from './SlidePlayer';
 export { default as SlideRenderer } from './SlideRenderer';
+export { TutorChat } from './TutorChat';

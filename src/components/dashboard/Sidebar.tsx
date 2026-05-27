@@ -18,6 +18,10 @@ import {
   BookOpen,
   Bookmark,
   Search,
+  Brain,
+  Award,
+  Users,
+  ClipboardList,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Logo } from '@/components/shared/Logo';
@@ -49,6 +53,7 @@ export function Sidebar({ role }: SidebarProps) {
     { icon: Home, label: t('sidebar.home'), href: '/dashboard/teacher' },
     { icon: Video, label: t('sidebar.myVideos'), href: '/dashboard/teacher/videos' },
     { icon: Plus, label: t('sidebar.newVideo'), href: '/dashboard/teacher/create' },
+    { icon: Users, label: 'Sınıflarım', href: '/dashboard/teacher/classrooms' },
     { icon: UserCircle, label: t('sidebar.referenceVideo'), href: '/dashboard/teacher/reference' },
     { icon: BarChart3, label: t('sidebar.analytics'), href: '/dashboard/teacher/analytics' },
     { icon: Settings, label: t('sidebar.settings'), href: '/dashboard/teacher/settings' },
@@ -58,7 +63,10 @@ export function Sidebar({ role }: SidebarProps) {
     { icon: Home, label: t('sidebar.home'), href: '/dashboard/student' },
     { icon: Search, label: t('sidebar.discover'), href: '/dashboard/student/browse' },
     { icon: BookOpen, label: t('sidebar.myCourses'), href: '/dashboard/student/courses' },
+    { icon: ClipboardList, label: 'Ödevlerim', href: '/dashboard/student/assignments' },
     { icon: Bookmark, label: t('sidebar.saved'), href: '/dashboard/student/saved' },
+    { icon: Brain, label: 'Tekrar', href: '/dashboard/student/review' },
+    { icon: Award, label: 'Portfolyo', href: '/dashboard/student/portfolio' },
     { icon: Settings, label: t('sidebar.settings'), href: '/dashboard/student/settings' },
   ];
 

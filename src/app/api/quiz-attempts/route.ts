@@ -78,6 +78,30 @@ export async function POST(request: NextRequest) {
     console.error('[QuizAttempts] insert failed:', insertErr.message);
   }
 
+  // Wrong answer → upsert into sr_items so the student reviews it later
+  if (!isCorrect && slide.quiz) {
+    await sb
+      .from('sr_items')
+      .upsert(
+        {
+          user_id: user.id,
+          video_id: videoId,
+          slide_number: slideNumber,
+          question: slide.quiz.question,
+          options: slide.quiz.options,
+          correct_answer: slide.quiz.correctAnswer,
+          explanation: slide.quiz.explanation || null,
+          due_date: new Date().toISOString().split('T')[0],
+          interval_days: 1,
+          repetitions: 0,
+        },
+        { onConflict: 'user_id,video_id,slide_number', ignoreDuplicates: false }
+      )
+      .then(({ error }: { error: { message: string } | null }) => {
+        if (error) console.error('[SR] upsert failed:', error.message);
+      });
+  }
+
   return NextResponse.json({
     isCorrect,
     correctAnswer,

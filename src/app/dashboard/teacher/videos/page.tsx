@@ -15,6 +15,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { VideoCard } from '@/components/dashboard';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { CreateVariantDialog } from '@/components/shared/CreateVariantDialog';
+import type { Video as VideoType } from '@/types';
 import { useVideoStore } from '@/stores/video-store';
 import { Skeleton } from '@/components/ui/skeleton';
 import { showToast } from '@/lib/utils/toast';
@@ -31,6 +33,7 @@ export default function TeacherVideosPage() {
     open: false,
     videoId: null,
   });
+  const [variantVideo, setVariantVideo] = useState<VideoType | null>(null);
 
   useEffect(() => {
     fetchVideos();
@@ -204,10 +207,11 @@ export default function TeacherVideosPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
             >
-              <VideoCard 
-                video={video} 
+              <VideoCard
+                video={video}
                 variant={viewMode === 'list' ? 'horizontal' : 'default'}
                 onDelete={handleDeleteClick}
+                onCreateVariant={(v) => setVariantVideo(v)}
               />
             </motion.div>
           ))}
@@ -233,6 +237,13 @@ export default function TeacherVideosPage() {
           )}
         </div>
       )}
+
+      {/* Variant Dialog */}
+      <CreateVariantDialog
+        video={variantVideo}
+        open={variantVideo !== null}
+        onOpenChange={(open) => { if (!open) setVariantVideo(null); }}
+      />
 
       {/* Confirm Delete Dialog */}
       <ConfirmDialog

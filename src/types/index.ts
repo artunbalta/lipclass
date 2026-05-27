@@ -34,6 +34,59 @@ export interface QuizData {
   explanation?: string;
 }
 
+// ── Slide Intent System ────────────────────────────────────────────────────
+// Each slide self-elects its pedagogical role and visual treatment during
+// Pass 1 (outline) so Pass 2 can specialise the generation prompt and the
+// finalize pipeline can route Manim / Mermaid / chart rendering deterministically.
+
+export type SlideRole =
+  | 'hook'           // Opening attention grabber
+  | 'definition'     // Term / concept definition
+  | 'concept'        // Conceptual explanation
+  | 'derivation'     // Step-by-step mathematical derivation
+  | 'worked_example' // Worked problem with full solution
+  | 'comparison'     // Side-by-side comparison of items
+  | 'experiment'     // Lab / scientific procedure
+  | 'visualization'  // Animation / chart / diagram is the centerpiece
+  | 'quiz'           // Interactive 4-option quiz
+  | 'summary';       // Recap / wrap-up
+
+export type VisualNeed =
+  | 'static'      // Text + formulas only
+  | 'diagram'     // Mermaid concept map / flowchart
+  | 'chart'       // Data chart (bar/line/pie)
+  | 'animation'   // Manim motion animation
+  | 'photo';      // Real-world image / illustration
+
+export interface SlideIntent {
+  role: SlideRole;
+  complexity: 1 | 2 | 3;            // Cognitive load (1=intro, 3=peak)
+  visualNeed: VisualNeed;
+  motionJustification?: string;     // Filled when visualNeed='animation'
+  estimatedDurationSec?: number;    // 30..120
+}
+
+export interface VisualHint {
+  diagramKind?: 'flowchart' | 'sequence' | 'pie' | 'graph' | 'mindmap';
+  chartKind?: 'bar' | 'line' | 'pie';
+  animationKind?:
+    | 'graph'
+    | 'vector_field'
+    | 'geometry_construction'
+    | 'oscillation'
+    | 'transformation'
+    | 'process_flow';
+  hasFormulas?: boolean;
+}
+
+export interface SlideOutline {
+  slideNumber: number;
+  title: string;
+  oneLineGoal: string;
+  intent: SlideIntent;
+  prerequisiteSlides?: number[];
+}
+
 export interface Slide {
   slideNumber: number;
   title: string;
@@ -51,6 +104,11 @@ export interface Slide {
   slideType?: SlideType;
   quiz?: QuizData;
 
+  // Slide-intent metadata produced by the outline + materialize pipeline.
+  // Optional for backwards compatibility with slides created before this system.
+  intent?: SlideIntent;
+  visualHint?: VisualHint;
+
   // Editor / regen state — set when teacher edits a slide between
   // slides_ready and the next finalize. Both fields are ISO timestamps.
   editedAt?: string;          // any field changed manually
@@ -60,6 +118,7 @@ export interface Slide {
 
 export interface SlidesData {
   slides: Slide[];
+  outline?: SlideOutline[]; // Pass 1 output; persisted so editor can render
 }
 
 // Video Types

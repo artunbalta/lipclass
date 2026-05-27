@@ -10,10 +10,15 @@ import {
   VolumeX,
   Maximize,
   Minimize,
+  Captions,
+  CaptionsOff,
+  Languages,
+  Brain,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Hls from 'hls.js';
 import SlideRenderer from './SlideRenderer';
+import { TutorChat } from './TutorChat';
 import type { SlidesData } from '@/types';
 
 interface SlidePlayerProps {
@@ -23,6 +28,9 @@ interface SlidePlayerProps {
   className?: string;
   /** Forwarded to SlideRenderer so quiz answers can be logged to /api/quiz-attempts. */
   videoId?: string;
+  language?: 'tr' | 'en';
+  /** Show AI Tutor / CC / Sign-lang controls. Default true. */
+  showAccessibility?: boolean;
 }
 
 /**
@@ -46,6 +54,8 @@ export default function SlidePlayer({
   title,
   className = '',
   videoId,
+  language = 'tr',
+  showAccessibility = true,
 }: SlidePlayerProps) {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -53,6 +63,11 @@ export default function SlidePlayer({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [mediaProgress, setMediaProgress] = useState(0);
   const [mediaDuration, setMediaDuration] = useState(0);
+
+  // Accessibility / tutor state
+  const [showCC, setShowCC] = useState(false);
+  const [showSignLang, setShowSignLang] = useState(false);
+  const [showTutor, setShowTutor] = useState(false);
 
   // Draggable video overlay position (snap to corners)
   const [videoCorner, setVideoCorner] = useState<'bottom-left' | 'bottom-right' | 'top-left' | 'top-right'>('bottom-left');
@@ -454,6 +469,26 @@ export default function SlidePlayer({
           <SlideRenderer slide={currentSlide} isPlaying={isPlaying} className="h-full" videoId={videoId} />
         </div>
 
+        {/* Closed-caption subtitle overlay */}
+        {showCC && currentSlide.narrationText && (
+          <div className="absolute bottom-0 inset-x-0 z-10 bg-black/80 px-4 py-2 pointer-events-none">
+            <p className="text-white text-sm leading-relaxed text-center line-clamp-3 select-none">
+              {currentSlide.narrationText}
+            </p>
+          </div>
+        )}
+
+        {/* Sign-language placeholder panel */}
+        {showSignLang && (
+          <div className="absolute top-4 right-20 z-20 bg-gray-900/95 rounded-xl p-3 border border-gray-700 w-36 text-center shadow-lg">
+            <p className="text-3xl mb-1">🤟</p>
+            <p className="text-xs font-medium text-gray-300">TİD Desteği</p>
+            <p className="text-[10px] text-gray-500 mt-1 leading-tight">
+              {language === 'tr' ? 'Bu özellik yakında geliyor' : 'Coming soon'}
+            </p>
+          </div>
+        )}
+
         {/* Teacher video overlay (draggable, snap-to-corner) */}
         {videoSrc && (
           <div
@@ -502,6 +537,17 @@ export default function SlidePlayer({
           </button>
         )}
       </div>
+
+      {/* AI Tutor panel (collapsible, sits between slide area and controls) */}
+      {showAccessibility && showTutor && (
+        <div className="h-56 border-t border-gray-700">
+          <TutorChat
+            slide={currentSlide}
+            language={language}
+            onClose={() => setShowTutor(false)}
+          />
+        </div>
+      )}
 
       {/* Controls bar */}
       <div className="bg-gray-900 px-4 py-3 space-y-2">
@@ -589,6 +635,37 @@ export default function SlidePlayer({
           </div>
 
           <div className="flex items-center gap-1">
+            {showAccessibility && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  title={language === 'tr' ? 'Altyazı' : 'Subtitles'}
+                  className={showCC ? 'text-primary h-8 w-8' : 'text-gray-300 hover:text-white h-8 w-8'}
+                  onClick={() => setShowCC((v) => !v)}
+                >
+                  {showCC ? <Captions className="w-4 h-4" /> : <CaptionsOff className="w-4 h-4" />}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  title={language === 'tr' ? 'İşaret Dili' : 'Sign Language'}
+                  className={showSignLang ? 'text-primary h-8 w-8' : 'text-gray-300 hover:text-white h-8 w-8'}
+                  onClick={() => setShowSignLang((v) => !v)}
+                >
+                  <Languages className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  title={language === 'tr' ? 'AI Öğretmen' : 'AI Tutor'}
+                  className={showTutor ? 'text-primary h-8 w-8' : 'text-gray-300 hover:text-white h-8 w-8'}
+                  onClick={() => setShowTutor((v) => !v)}
+                >
+                  <Brain className="w-4 h-4" />
+                </Button>
+              </>
+            )}
             <Button
               variant="ghost"
               size="icon"

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   TrendingUp,
@@ -11,60 +11,145 @@ import {
   Video,
   Calendar,
   Download,
-  Share2
+  Share2,
+  Loader2,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { StatsCard } from '@/components/dashboard';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useVideoStore } from '@/stores/video-store';
+import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { computeCoverage, findByCode } from '@/lib/curriculum/meb-catalog';
-import { cn } from '@/lib/utils';
 
-// Mock analytics data
-const mockChartData = {
-  views: [
-    { day: 'Pzt', value: 45 },
-    { day: 'Sal', value: 62 },
-    { day: 'Çar', value: 38 },
-    { day: 'Per', value: 81 },
-    { day: 'Cum', value: 94 },
-    { day: 'Cmt', value: 67 },
-    { day: 'Paz', value: 52 },
-  ],
-  engagement: [
-    { day: 'Pzt', value: 65 },
-    { day: 'Sal', value: 72 },
-    { day: 'Çar', value: 58 },
-    { day: 'Per', value: 85 },
-    { day: 'Cum', value: 91 },
-    { day: 'Cmt', value: 68 },
-    { day: 'Paz', value: 59 },
-  ],
-};
+// ── Real analytics response shape (mirrors /api/teacher/analytics) ─────────
+interface AnalyticsResponse {
+  range: 'week' | 'month' | 'year';
+  totals: {
+    totalViews: number;
+    totalVideos: number;
+    studentCount: number;
+    completionRate: number;
+    avgWatchSeconds: number;
+    likeRate: number;
+    quizAvgScore: number | null;
+    quizAttempts: number;
+  };
+  trend: {
+    views: Array<{ label: string; value: number }>;
+    completion: Array<{ label: string; value: number }>;
+  };
+  topVideos: Array<{
+    id: string;
+    title: string;
+    views: number;
+    completionRate: number;
+    likeCount: number;
+    trend: 'up' | 'down' | 'flat';
+  }>;
+}
 
-const topVideos = [
-  { id: '1', title: 'Birinci Dereceden Denklemler', views: 245, engagement: 87, trend: 'up' },
-  { id: '2', title: 'Oran ve Orantı', views: 312, engagement: 82, trend: 'up' },
-  { id: '3', title: 'Üçgenler ve Özellikleri', views: 189, engagement: 76, trend: 'down' },
-  { id: '4', title: 'Kareköklü Sayılar', views: 156, engagement: 71, trend: 'up' },
-];
+function formatDurationMMSS(seconds: number): string {
+  if (!seconds || seconds < 0) return '0:00';
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+interface ClassroomWithStudents {
+  id: string;
+  name: string;
+  join_code: string;
+  students: Array<{
+    id: string;
+    name: string;
+    email: string;
+    avatar?: string;
+    watchedVideos: number;
+    quizAttempts: number;
+    quizScore: number | null;
+  }>;
+}
 
 export default function TeacherAnalyticsPage() {
-  const { stats, videos, fetchVideos } = useVideoStore();
+  const { videos, fetchVideos } = useVideoStore();
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'year'>('month');
-  const [chartData, setChartData] = useState(mockChartData.views);
+  const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [expandedReport, setExpandedReport] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'overview' | 'students'>('overview');
+  const [classrooms, setClassrooms] = useState<ClassroomWithStudents[]>([]);
+  const [studentsLoading, setStudentsLoading] = useState(false);
+  const [expandedClass, setExpandedClass] = useState<string | null>(null);
 
   useEffect(() => {
     fetchVideos();
   }, [fetchVideos]);
 
+  // Fetch real aggregated analytics whenever the range changes. The setState
+  // calls before fetch are intentional — they reset the UI to a loading state
+  // before subscribing to the external HTTP "system".
   useEffect(() => {
-    // Simulate different data based on time range
-    setChartData(timeRange === 'week' ? mockChartData.views : mockChartData.engagement);
+    let cancelled = false;
+    const ctrl = new AbortController();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAnalyticsLoading(true);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAnalyticsError(null);
+    fetch(`/api/teacher/analytics?range=${timeRange}`, { signal: ctrl.signal })
+      .then(async (r) => {
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          throw new Error((err as { error?: string }).error || `Sunucu hatası (${r.status})`);
+        }
+        return r.json() as Promise<AnalyticsResponse>;
+      })
+      .then((data) => {
+        if (!cancelled) setAnalytics(data);
+      })
+      .catch((e) => {
+        if (cancelled || e.name === 'AbortError') return;
+        setAnalyticsError(e instanceof Error ? e.message : 'Veri alınamadı');
+      })
+      .finally(() => {
+        if (!cancelled) setAnalyticsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+      ctrl.abort();
+    };
   }, [timeRange]);
+
+  const loadStudents = useCallback(async () => {
+    if (classrooms.length > 0) return;
+    setStudentsLoading(true);
+    const res = await fetch('/api/classrooms');
+    if (!res.ok) { setStudentsLoading(false); return; }
+    const { classrooms: cls } = (await res.json()) as {
+      classrooms: Array<{ id: string; name: string; join_code: string }>;
+    };
+    const withStudents = await Promise.all(
+      (cls ?? []).map(async (c) => {
+        const sRes = await fetch(`/api/classrooms/${c.id}/students`);
+        const sData = sRes.ok
+          ? ((await sRes.json()) as { students?: ClassroomWithStudents['students'] })
+          : { students: [] };
+        return { id: c.id, name: c.name, join_code: c.join_code, students: sData.students ?? [] };
+      })
+    );
+    setClassrooms(withStudents);
+    setStudentsLoading(false);
+  }, [classrooms.length]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (activeTab === 'students') loadStudents();
+  }, [activeTab, loadStudents]);
 
   // Compute MEB coverage from the teacher's published/processing videos
   const coverageReports = useMemo(() => {
@@ -89,7 +174,33 @@ export default function TeacherAnalyticsPage() {
     return map;
   }, [videos]);
 
-  const maxValue = Math.max(...chartData.map(d => d.value));
+  // Derive chart series + scaffolding from the real response.
+  const chartData = analytics?.trend.views ?? [];
+  const completionSeries = analytics?.trend.completion ?? [];
+  const maxValue = Math.max(1, ...chartData.map((d) => d.value));
+  const topVideos = analytics?.topVideos ?? [];
+  const totals = analytics?.totals;
+
+  // Compare current vs previous bucket halves to give an honest "trend".
+  // Skip when there are too few buckets to be meaningful.
+  function halfTrend(series: Array<{ value: number }>): { delta: number; isPositive: boolean } | null {
+    if (!series || series.length < 4) return null;
+    const half = Math.floor(series.length / 2);
+    const prev = series.slice(0, half).reduce((s, x) => s + x.value, 0);
+    const curr = series.slice(half).reduce((s, x) => s + x.value, 0);
+    if (prev === 0 && curr === 0) return null;
+    if (prev === 0) return { delta: 100, isPositive: curr > 0 };
+    const pct = Math.round(((curr - prev) / prev) * 100);
+    return { delta: Math.abs(pct), isPositive: pct >= 0 };
+  }
+
+  const viewsTrend = halfTrend(chartData);
+  const completionTrend = halfTrend(completionSeries);
+
+  // Honest insight: pick the top-1 video and call out its trend; fall back to
+  // a "create more content" nudge when we don't have data.
+  const insightTop = topVideos[0];
+  const insightAvgWatch = totals?.avgWatchSeconds ?? 0;
 
   return (
     <div className="space-y-6">
@@ -113,7 +224,107 @@ export default function TeacherAnalyticsPage() {
         </div>
       </div>
 
+      {/* Main tab selector */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'overview' | 'students')}>
+        <TabsList>
+          <TabsTrigger value="overview">Genel Bakış</TabsTrigger>
+          <TabsTrigger value="students">Öğrenci Detayı</TabsTrigger>
+        </TabsList>
+
+        {/* ── STUDENTS TAB ──────────────────────────── */}
+        <TabsContent value="students" className="mt-6 space-y-4">
+          {studentsLoading ? (
+            <div className="flex justify-center py-16">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            </div>
+          ) : classrooms.length === 0 ? (
+            <div className="text-center py-16 text-muted-foreground">
+              <Users className="w-10 h-10 mx-auto mb-3 opacity-40" />
+              <p className="font-medium">Henüz sınıf yok</p>
+              <p className="text-sm mt-1">
+                Sınıflarım sayfasından sınıf oluşturup öğrenci ekleyebilirsiniz.
+              </p>
+            </div>
+          ) : (
+            classrooms.map((cls) => {
+              const isExp = expandedClass === cls.id;
+              const avgScore = cls.students.length > 0
+                ? Math.round(cls.students.filter(s => s.quizScore !== null).reduce((a, s) => a + (s.quizScore ?? 0), 0) / Math.max(1, cls.students.filter(s => s.quizScore !== null).length))
+                : null;
+              return (
+                <div key={cls.id} className="rounded-xl border border-border bg-card overflow-hidden">
+                  <button
+                    className="w-full flex items-center gap-3 p-4 text-left hover:bg-muted/30 transition-colors"
+                    onClick={() => setExpandedClass(isExp ? null : cls.id)}
+                  >
+                    <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                      <Users className="w-4 h-4 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-semibold">{cls.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {cls.students.length} öğrenci
+                        {avgScore !== null && ` · Ort. %${avgScore} quiz`}
+                      </p>
+                    </div>
+                    <Badge variant="secondary" className="font-mono text-xs shrink-0">{cls.join_code}</Badge>
+                    {isExp
+                      ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                      : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
+                  </button>
+
+                  {isExp && (
+                    <div className="border-t border-border p-4">
+                      {cls.students.length === 0 ? (
+                        <p className="text-sm text-muted-foreground italic">Bu sınıfta henüz öğrenci yok.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-4 text-xs font-medium text-muted-foreground px-2 mb-1">
+                            <span className="col-span-2">Öğrenci</span>
+                            <span className="text-center">Video</span>
+                            <span className="text-center">Quiz</span>
+                          </div>
+                          {cls.students.map(s => (
+                            <div key={s.id} className="grid grid-cols-4 items-center p-2 rounded-lg bg-muted/40 gap-2">
+                              <div className="col-span-2 flex items-center gap-2 min-w-0">
+                                <Avatar className="w-7 h-7 shrink-0">
+                                  <AvatarImage src={s.avatar} />
+                                  <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                                    {s.name?.split(' ').map(n => n[0]).join('')}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="min-w-0">
+                                  <p className="text-sm font-medium truncate">{s.name}</p>
+                                  <p className="text-xs text-muted-foreground truncate">{s.email}</p>
+                                </div>
+                              </div>
+                              <p className="text-center text-sm">{s.watchedVideos}</p>
+                              <p className={cn(
+                                'text-center text-sm font-medium',
+                                s.quizScore === null ? 'text-muted-foreground'
+                                : s.quizScore >= 70 ? 'text-emerald-600'
+                                : s.quizScore >= 40 ? 'text-amber-600'
+                                : 'text-destructive'
+                              )}>
+                                {s.quizScore !== null ? `%${s.quizScore}` : '—'}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </TabsContent>
+
+        {/* ── OVERVIEW TAB ──────────────────────────── */}
+        <TabsContent value="overview" className="mt-0">
+
       {/* Time Range Selector */}
+      <div className="mt-6">
       <Tabs value={timeRange} onValueChange={(v) => setTimeRange(v as typeof timeRange)}>
         <TabsList>
           <TabsTrigger value="week">Haftalık</TabsTrigger>
@@ -121,37 +332,53 @@ export default function TeacherAnalyticsPage() {
           <TabsTrigger value="year">Yıllık</TabsTrigger>
         </TabsList>
       </Tabs>
+      </div>
 
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatsCard
-          title="Toplam İzlenme"
-          value={stats.totalViews.toLocaleString()}
-          icon={Eye}
-          trend={{ value: 12, isPositive: true }}
-          color="primary"
-        />
-        <StatsCard
-          title="Ortalama İzlenme Süresi"
-          value="8:24"
-          icon={Clock}
-          trend={{ value: 5, isPositive: true }}
-          color="accent"
-        />
-        <StatsCard
-          title="Aktif Öğrenci"
-          value={stats.studentCount}
-          icon={Users}
-          color="emerald"
-        />
-        <StatsCard
-          title="Tamamlanma Oranı"
-          value="78%"
-          icon={Video}
-          trend={{ value: 3, isPositive: false }}
-          color="amber"
-        />
-      </div>
+      {analyticsLoading && !analytics ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-28 rounded-xl" />
+          ))}
+        </div>
+      ) : analyticsError ? (
+        <div className="p-4 rounded-xl border border-destructive/30 bg-destructive/5 text-sm text-destructive">
+          İstatistikler yüklenemedi: {analyticsError}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatsCard
+            title="Toplam İzlenme"
+            value={(totals?.totalViews ?? 0).toLocaleString()}
+            icon={Eye}
+            trend={viewsTrend ? { value: viewsTrend.delta, isPositive: viewsTrend.isPositive } : undefined}
+            color="primary"
+          />
+          <StatsCard
+            title="Ortalama İzlenme Süresi"
+            value={formatDurationMMSS(totals?.avgWatchSeconds ?? 0)}
+            icon={Clock}
+            color="accent"
+          />
+          <StatsCard
+            title="Aktif Öğrenci"
+            value={totals?.studentCount ?? 0}
+            icon={Users}
+            color="emerald"
+          />
+          <StatsCard
+            title="Tamamlanma Oranı"
+            value={`%${totals?.completionRate ?? 0}`}
+            icon={Video}
+            trend={
+              completionTrend
+                ? { value: completionTrend.delta, isPositive: completionTrend.isPositive }
+                : undefined
+            }
+            color="amber"
+          />
+        </div>
+      )}
 
       {/* MEB Müfredat Kapsamı */}
       <motion.div
@@ -295,25 +522,32 @@ export default function TeacherAnalyticsPage() {
           className="p-6 rounded-xl border border-border bg-card"
         >
           <h3 className="font-semibold mb-4">İzlenme Trendi</h3>
-          <div className="h-64 flex items-end justify-between gap-2">
-            {chartData.map((item, index) => (
-              <div key={item.day} className="flex-1 flex flex-col items-center gap-2">
-                <div className="relative w-full h-full flex items-end">
-                  <motion.div
-                    initial={{ height: 0 }}
-                    animate={{ height: `${(item.value / maxValue) * 100}%` }}
-                    transition={{ delay: index * 0.1, duration: 0.5 }}
-                    className="w-full bg-gradient-to-t from-primary to-primary/60 rounded-t-lg min-h-[20px]"
-                  />
+          {chartData.length === 0 || chartData.every((d) => d.value === 0) ? (
+            <div className="h-64 flex flex-col items-center justify-center text-sm text-muted-foreground">
+              <Eye className="w-8 h-8 mb-2 opacity-40" />
+              <p>Bu aralıkta henüz izlenme yok.</p>
+            </div>
+          ) : (
+            <div className="h-64 flex items-end justify-between gap-2">
+              {chartData.map((item, index) => (
+                <div key={`${item.label}-${index}`} className="flex-1 flex flex-col items-center gap-2">
+                  <div className="relative w-full h-full flex items-end">
+                    <motion.div
+                      initial={{ height: 0 }}
+                      animate={{ height: `${(item.value / maxValue) * 100}%` }}
+                      transition={{ delay: index * 0.05, duration: 0.5 }}
+                      className="w-full bg-gradient-to-t from-primary to-primary/60 rounded-t-lg min-h-[4px]"
+                    />
+                  </div>
+                  <span className="text-xs text-muted-foreground">{item.label}</span>
+                  <span className="text-xs font-medium">{item.value}</span>
                 </div>
-                <span className="text-xs text-muted-foreground">{item.day}</span>
-                <span className="text-xs font-medium">{item.value}</span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </motion.div>
 
-        {/* Engagement Chart */}
+        {/* Engagement Chart — real metrics derived from totals */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -321,64 +555,48 @@ export default function TeacherAnalyticsPage() {
           className="p-6 rounded-xl border border-border bg-card"
         >
           <h3 className="font-semibold mb-4">Etkileşim Oranı</h3>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span>Video Tamamlama</span>
-                <span className="font-medium">78%</span>
-              </div>
-              <div className="h-2 bg-muted rounded-full overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: '78%' }}
-                  transition={{ delay: 0.3, duration: 0.8 }}
-                  className="h-full bg-emerald-500"
-                />
-              </div>
+          {totals && totals.totalViews > 0 ? (
+            <div className="space-y-4">
+              <EngagementBar
+                label="Video Tamamlama"
+                value={totals.completionRate}
+                color="bg-emerald-500"
+                delay={0.3}
+              />
+              <EngagementBar
+                label="Beğeni Oranı"
+                value={totals.likeRate}
+                color="bg-primary"
+                delay={0.4}
+              />
+              <EngagementBar
+                label="Quiz Başarı Ortalaması"
+                value={totals.quizAvgScore ?? 0}
+                suffix={
+                  totals.quizAvgScore === null
+                    ? '— (deneme yok)'
+                    : `(${totals.quizAttempts} cevap)`
+                }
+                color="bg-accent"
+                delay={0.5}
+                muted={totals.quizAvgScore === null}
+              />
+              <EngagementBar
+                label="Aktif Öğrenci / İzlenme"
+                value={
+                  totals.totalViews === 0
+                    ? 0
+                    : Math.round((totals.studentCount / totals.totalViews) * 100)
+                }
+                color="bg-amber-500"
+                delay={0.6}
+              />
             </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span>Beğeni Oranı</span>
-                <span className="font-medium">92%</span>
-              </div>
-              <div className="h-2 bg-muted rounded-full overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: '92%' }}
-                  transition={{ delay: 0.4, duration: 0.8 }}
-                  className="h-full bg-primary"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span>Paylaşım</span>
-                <span className="font-medium">34%</span>
-              </div>
-              <div className="h-2 bg-muted rounded-full overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: '34%' }}
-                  transition={{ delay: 0.5, duration: 0.8 }}
-                  className="h-full bg-accent"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span>Yorum/Etkileşim</span>
-                <span className="font-medium">56%</span>
-              </div>
-              <div className="h-2 bg-muted rounded-full overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: '56%' }}
-                  transition={{ delay: 0.6, duration: 0.8 }}
-                  className="h-full bg-amber-500"
-                />
-              </div>
-            </div>
-          </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Etkileşim hesaplanabilmesi için en az 1 izlenme gerek.
+            </p>
+          )}
         </motion.div>
       </div>
 
@@ -390,40 +608,50 @@ export default function TeacherAnalyticsPage() {
         className="p-6 rounded-xl border border-border bg-card"
       >
         <h3 className="font-semibold mb-4">En Popüler Videolar</h3>
-        <div className="space-y-4">
-          {topVideos.map((video, index) => (
-            <div
-              key={video.id}
-              className="flex items-center justify-between p-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-            >
-              <div className="flex items-center gap-4 flex-1 min-w-0">
-                <div className="text-2xl font-bold text-muted-foreground">
-                  #{index + 1}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{video.title}</p>
-                  <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Eye className="w-3.5 h-3.5" />
-                      {video.views} görüntülenme
-                    </span>
-                    <span>{video.engagement}% etkileşim</span>
+        {topVideos.length === 0 ? (
+          <div className="py-8 text-center text-sm text-muted-foreground">
+            <Video className="w-8 h-8 mx-auto mb-2 opacity-40" />
+            <p>Bu aralıkta sıralanacak izlenme yok.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {topVideos.map((video, index) => (
+              <div
+                key={video.id}
+                className="flex items-center justify-between p-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+              >
+                <div className="flex items-center gap-4 flex-1 min-w-0">
+                  <div className="text-2xl font-bold text-muted-foreground">
+                    #{index + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{video.title}</p>
+                    <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Eye className="w-3.5 h-3.5" />
+                        {video.views} izlenme
+                      </span>
+                      <span>%{video.completionRate} tamamlama</span>
+                      {video.likeCount > 0 && <span>{video.likeCount} beğeni</span>}
+                    </div>
                   </div>
                 </div>
+                <div className="flex items-center gap-2">
+                  {video.trend === 'up' ? (
+                    <TrendingUp className="w-5 h-5 text-emerald-500" />
+                  ) : video.trend === 'down' ? (
+                    <TrendingDown className="w-5 h-5 text-destructive" />
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                {video.trend === 'up' ? (
-                  <TrendingUp className="w-5 h-5 text-emerald-500" />
-                ) : (
-                  <TrendingDown className="w-5 h-5 text-destructive" />
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </motion.div>
 
-      {/* Insights */}
+      {/* Insights — derived from real data, not hard-coded */}
       <div className="grid md:grid-cols-2 gap-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -433,11 +661,15 @@ export default function TeacherAnalyticsPage() {
         >
           <h3 className="font-semibold mb-3 flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-primary" />
-            Pozitif Trend
+            {viewsTrend?.isPositive ? 'Pozitif Trend' : viewsTrend ? 'Düşüş' : 'Trend'}
           </h3>
           <p className="text-sm text-muted-foreground">
-            Bu hafta video izlenmeleriniz %12 arttı. Özellikle &quot;Oran ve Orantı&quot; 
-            videosu en çok ilgi gören içerik oldu.
+            {viewsTrend
+              ? viewsTrend.isPositive
+                ? `Bu aralıkta izlenmeleriniz önceki yarıya göre %${viewsTrend.delta} arttı.`
+                : `Bu aralıkta izlenmeleriniz önceki yarıya göre %${viewsTrend.delta} azaldı.`
+              : 'Yeterli veri yok — birkaç gün sonra trendi göstereceğiz.'}
+            {insightTop ? ` En çok izlenen: "${insightTop.title}".` : ''}
           </p>
         </motion.div>
 
@@ -452,10 +684,54 @@ export default function TeacherAnalyticsPage() {
             Öneri
           </h3>
           <p className="text-sm text-muted-foreground">
-            Ortalama izlenme süresini artırmak için videolarınızı 10-15 dakika 
-            aralığında tutmanız önerilir.
+            {insightAvgWatch === 0
+              ? 'Henüz izlenme verisi yok. Bir videonu sınıfa atayıp tekrar kontrol et.'
+              : insightAvgWatch < 120
+              ? `Ortalama izlenme ${formatDurationMMSS(insightAvgWatch)}. Öğrenciler ilk 2 dakikada bırakıyor — başlangıçta dikkat çekici bir kanca slaytı kullanmayı dene.`
+              : insightAvgWatch < 300
+              ? `Ortalama izlenme ${formatDurationMMSS(insightAvgWatch)}. Orta seviyede — videoyu 5-8 dakika tutarsan tamamlama oranı genelde yükselir.`
+              : `Ortalama izlenme süresi ${formatDurationMMSS(insightAvgWatch)} — çok iyi. Bu uzunluğu koruyup quiz slaytı ekleyerek etkileşimi artırabilirsin.`}
           </p>
         </motion.div>
+      </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+// Reusable engagement bar — extracted so the chart card stays scannable.
+function EngagementBar({
+  label,
+  value,
+  color,
+  delay,
+  suffix,
+  muted,
+}: {
+  label: string;
+  value: number;
+  color: string;
+  delay: number;
+  suffix?: string;
+  muted?: boolean;
+}) {
+  const clamped = Math.max(0, Math.min(100, value));
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between text-sm">
+        <span>{label}</span>
+        <span className={cn('font-medium', muted && 'text-muted-foreground')}>
+          {muted ? suffix : `%${clamped}${suffix ? ` ${suffix}` : ''}`}
+        </span>
+      </div>
+      <div className="h-2 bg-muted rounded-full overflow-hidden">
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${clamped}%` }}
+          transition={{ delay, duration: 0.8 }}
+          className={cn('h-full', color)}
+        />
       </div>
     </div>
   );

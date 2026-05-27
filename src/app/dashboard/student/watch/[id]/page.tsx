@@ -105,6 +105,7 @@ export default function WatchVideoPage() {
                 referenceVideoUrl={refVideoUrl}
                 title={selectedVideo.title}
                 videoId={selectedVideo.id}
+                language={selectedVideo.language ?? 'tr'}
               />
             ) : (
               <div className="relative aspect-video rounded-xl overflow-hidden bg-slate-900 flex items-center justify-center">

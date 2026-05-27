@@ -4,17 +4,18 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { 
-  Play, 
-  Clock, 
-  Eye, 
-  MoreVertical, 
-  Edit, 
-  Trash2, 
-  Share2, 
+import {
+  Play,
+  Clock,
+  Eye,
+  MoreVertical,
+  Edit,
+  Trash2,
+  Share2,
   Download,
   Bookmark,
-  BookmarkCheck
+  BookmarkCheck,
+  Copy,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -37,6 +38,7 @@ interface VideoCardProps {
   showActions?: boolean;
   onDelete?: (id: string) => void;
   onSave?: (id: string) => void;
+  onCreateVariant?: (video: Video) => void;
   isSaved?: boolean;
 }
 
@@ -55,6 +57,7 @@ export function VideoCard({
   showActions = true,
   onDelete,
   onSave,
+  onCreateVariant,
   isSaved = false,
 }: VideoCardProps) {
   const [imageError, setImageError] = useState(false);
@@ -123,6 +126,12 @@ export function VideoCard({
                       Düzenle
                     </Link>
                   </DropdownMenuItem>
+                  {onCreateVariant && (
+                    <DropdownMenuItem onClick={() => onCreateVariant(video)}>
+                      <Copy className="w-4 h-4 mr-2" />
+                      Varyant Oluştur
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem>
                     <Share2 className="w-4 h-4 mr-2" />
                     Paylaş
@@ -132,7 +141,7 @@ export function VideoCard({
                     İndir
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem 
+                  <DropdownMenuItem
                     className="text-destructive focus:text-destructive"
                     onClick={() => onDelete?.(video.id)}
                   >
@@ -254,10 +263,18 @@ export function VideoCard({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem>
-                  <Edit className="w-4 h-4 mr-2" />
-                  Düzenle
+                <DropdownMenuItem asChild>
+                  <Link href={editHref}>
+                    <Edit className="w-4 h-4 mr-2" />
+                    Düzenle
+                  </Link>
                 </DropdownMenuItem>
+                {onCreateVariant && (
+                  <DropdownMenuItem onClick={() => onCreateVariant(video)}>
+                    <Copy className="w-4 h-4 mr-2" />
+                    Varyant Oluştur
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem>
                   <Share2 className="w-4 h-4 mr-2" />
                   Paylaş
@@ -267,7 +284,7 @@ export function VideoCard({
                   İndir
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
                   onClick={() => onDelete?.(video.id)}
                 >

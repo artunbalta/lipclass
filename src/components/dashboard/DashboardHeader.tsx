@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Search,
@@ -32,11 +32,59 @@ interface DashboardHeaderProps {
   showMenuButton?: boolean;
 }
 
+interface Notification {
+  id: string;
+  type: string;
+  title: string;
+  body: string | null;
+  link: string | null;
+  read: boolean;
+  created_at: string;
+}
+
 export function DashboardHeader({ onMenuClick, showMenuButton = false }: DashboardHeaderProps) {
   const { user, logout } = useAuthStore();
   const { theme, setTheme } = useTheme();
   const { t } = useLanguage();
   const [searchOpen, setSearchOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifOpen, setNotifOpen] = useState(false);
+
+  const loadNotifications = useCallback(async () => {
+    try {
+      const res = await fetch('/api/notifications');
+      if (res.ok) {
+        const d = await res.json();
+        setNotifications(d.notifications ?? []);
+      }
+    } catch { /* silent */ }
+  }, []);
+
+  useEffect(() => {
+    loadNotifications();
+  }, [loadNotifications]);
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  const markAllRead = async () => {
+    await fetch('/api/notifications?all=1', { method: 'PATCH' });
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  };
+
+  const markRead = async (id: string) => {
+    await fetch(`/api/notifications?id=${id}`, { method: 'PATCH' });
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  };
+
+  const relativeTime = (iso: string) => {
+    const diff = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'şimdi';
+    if (mins < 60) return `${mins} dk önce`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours} sa önce`;
+    return `${Math.floor(hours / 24)} gün önce`;
+  };
 
   const toggleDarkMode = () => {
     setTheme(theme === 'dark' ? 'light' : 'dark');
@@ -87,36 +135,58 @@ export function DashboardHeader({ onMenuClick, showMenuButton = false }: Dashboa
         </Button>
 
         {/* Notifications */}
-        <DropdownMenu>
+        <DropdownMenu open={notifOpen} onOpenChange={setNotifOpen}>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative">
               <Bell className="w-5 h-5" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full" />
+              {unreadCount > 0 && (
+                <span className="absolute top-1 right-1 w-4 h-4 bg-destructive rounded-full text-[10px] text-white flex items-center justify-center font-bold">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-80">
-            <DropdownMenuLabel>{t('header.notifications')}</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <div className="max-h-64 overflow-y-auto">
-              <DropdownMenuItem className="flex flex-col items-start gap-1 cursor-pointer">
-                <p className="text-sm font-medium">Yeni video hazır!</p>
-                <p className="text-xs text-muted-foreground">
-                  "Birinci Dereceden Denklemler" videosu oluşturuldu.
-                </p>
-                <span className="text-xs text-muted-foreground">2 saat önce</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="flex flex-col items-start gap-1 cursor-pointer">
-                <p className="text-sm font-medium">İzlenme rekoru!</p>
-                <p className="text-xs text-muted-foreground">
-                  Videonuz bu hafta 100+ kez izlendi.
-                </p>
-                <span className="text-xs text-muted-foreground">1 gün önce</span>
-              </DropdownMenuItem>
+            <div className="flex items-center justify-between px-2 py-1.5">
+              <DropdownMenuLabel className="py-0">{t('header.notifications')}</DropdownMenuLabel>
+              {unreadCount > 0 && (
+                <button onClick={markAllRead} className="text-xs text-primary hover:underline">
+                  Tümünü okundu işaretle
+                </button>
+              )}
             </div>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-center text-primary cursor-pointer">
-              {t('common.viewAll')}
-            </DropdownMenuItem>
+            <div className="max-h-72 overflow-y-auto">
+              {notifications.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">
+                  Bildirim yok
+                </p>
+              ) : (
+                notifications.map(n => (
+                  <DropdownMenuItem
+                    key={n.id}
+                    className="flex flex-col items-start gap-1 cursor-pointer"
+                    onClick={() => {
+                      markRead(n.id);
+                      if (n.link) window.location.href = n.link;
+                    }}
+                  >
+                    <div className="flex items-start gap-2 w-full">
+                      {!n.read && (
+                        <span className="w-2 h-2 rounded-full bg-primary shrink-0 mt-1.5" />
+                      )}
+                      <div className={!n.read ? '' : 'ml-4'}>
+                        <p className="text-sm font-medium">{n.title}</p>
+                        {n.body && (
+                          <p className="text-xs text-muted-foreground">{n.body}</p>
+                        )}
+                        <span className="text-xs text-muted-foreground">{relativeTime(n.created_at)}</span>
+                      </div>
+                    </div>
+                  </DropdownMenuItem>
+                ))
+              )}
+            </div>
           </DropdownMenuContent>
         </DropdownMenu>
 

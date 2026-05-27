@@ -213,4 +213,13 @@
   .section-padding {
     @apply py-24 lg:py-32;
   }
+
+  /* Dyslexia-friendly reading mode */
+  .font-dyslexic,
+  .font-dyslexic * {
+    font-family: 'Comic Sans MS', 'Trebuchet MS', 'Arial', sans-serif !important;
+    letter-spacing: 0.12em !important;
+    word-spacing: 0.18em !important;
+    line-height: 1.75 !important;
+  }
 }

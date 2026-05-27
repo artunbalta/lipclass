@@ -195,8 +195,23 @@ export async function finalizeServerSide(opts: FinalizeServerOptions): Promise<v
     };
 
     const runManimParallel = async () => {
-      const tasks = workingSlides.map(async (slide) => {
-        if (incremental && slide.animationUrl) return;
+      // Intent-aware filter: when the outline pipeline produced an intent,
+      // only fire Manim for slides that actually need motion. This eliminates
+      // the wasted ~40-60% of calls that the legacy SKIP path used to swallow.
+      // Slides created before the intent system (intent undefined) keep the
+      // legacy LLM-judged SKIP behavior for backwards compat.
+      const eligible = workingSlides.filter((slide) => {
+        if (incremental && slide.animationUrl) return false;
+        if (slide.intent) return slide.intent.visualNeed === 'animation';
+        return true; // legacy
+      });
+
+      const skipped = workingSlides.length - eligible.length;
+      if (skipped > 0) {
+        console.log(`[Finalize] Manim: ${eligible.length} eligible / ${skipped} skipped via intent`);
+      }
+
+      const tasks = eligible.map(async (slide) => {
         try {
           const manimCode = await generateManimCode(
             {

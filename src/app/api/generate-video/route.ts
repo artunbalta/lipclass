@@ -25,11 +25,15 @@ import { ingestFromUrl } from '@/lib/api/bunny-stream';
 
 import { falRequest } from '@/lib/llm/fal-client';
 import { generateSlides, regenerateSingleSlide, generateQuiz } from '@/lib/llm/slides';
+import { generateOutline } from '@/lib/llm/outline';
+import { materializeSlide } from '@/lib/llm/materialize';
 import { textToSpeech } from '@/lib/llm/tts';
 import { createLipsyncVideo } from '@/lib/llm/lipsync';
 import { generateManimCode, renderManimAnimation } from '@/lib/llm/manim';
 import { computeSlidesHash } from '@/lib/llm/content-hash';
 import { findCachedSlides } from '@/lib/api/slide-cache';
+import type { SlideOutline } from '@/types';
+import type { SlideLanguage, SlideTone } from '@/lib/llm/prompts';
 
 // 5 minutes — needed for lipsync polling and Manim render calls
 export const maxDuration = 300;
@@ -65,6 +69,55 @@ export async function POST(request: NextRequest) {
 
       const context = await retrieveContext(query, teacherId, documentIds || undefined, 8);
       return NextResponse.json({ context });
+    }
+
+    // ── Step: outline (Pass 1 of the 2-pass pipeline) ──────────────────────
+    if (step === 'outline') {
+      if (!topic || !description) {
+        return NextResponse.json({ error: 'Topic and description are required' }, { status: 400 });
+      }
+      const { totalSlides } = body as { totalSlides?: number };
+      const result = await generateOutline({
+        topic,
+        description,
+        language: language as SlideLanguage,
+        tone: tone as SlideTone,
+        includesProblemSolving,
+        problemCount,
+        difficulty,
+        ragContext,
+        totalSlides: totalSlides ?? 10,
+      });
+      return NextResponse.json({ outline: result.outline, stage: 'outline_complete' });
+    }
+
+    // ── Step: materialize_slide (Pass 2 — one slide at a time) ─────────────
+    if (step === 'materialize_slide') {
+      const { outlineSlide, totalSlides: total, siblingTitles } = body as {
+        outlineSlide: SlideOutline;
+        totalSlides: number;
+        siblingTitles: string[];
+      };
+
+      if (!topic || !description || !outlineSlide || !total || !Array.isArray(siblingTitles)) {
+        return NextResponse.json(
+          { error: 'topic, description, outlineSlide, totalSlides, and siblingTitles are required' },
+          { status: 400 }
+        );
+      }
+
+      const slide = await materializeSlide({
+        topic,
+        description,
+        language: language as SlideLanguage,
+        tone: tone as SlideTone,
+        outline: outlineSlide,
+        totalSlides: total,
+        siblingTitles,
+        ragContext,
+      });
+
+      return NextResponse.json({ slide, stage: 'materialize_complete' });
     }
 
     // ── Step: slides ───────────────────────────────────────────────────────
@@ -378,9 +431,113 @@ Rules:
       return NextResponse.json({ quiz, stage: 'generate_quiz_complete' });
     }
 
+    // ── Step: whiteboard_extract (vision LLM — extracts lesson content from image) ──
+    if (step === 'whiteboard_extract') {
+      const { image_url } = body as { image_url: string };
+      if (!image_url) {
+        return NextResponse.json({ error: 'image_url is required' }, { status: 400 });
+      }
+
+      const extractPrompt =
+        'You are analyzing a whiteboard or handwritten classroom notes photo. ' +
+        'Extract all educational content and return a JSON object with these fields: ' +
+        '{"topic":"main topic/title (5-10 words max)","description":"detailed description of content (200-400 chars), including key concepts and any formulas described in plain text","formulas":["list of LaTeX formulas found"]}. ' +
+        'Return ONLY the JSON object, no markdown fences, no explanation.';
+
+      const response = await falRequest<{ output: string }>('fal-ai/any-llm', {
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'image_url', image_url: { url: image_url } },
+              { type: 'text', text: extractPrompt },
+            ],
+          },
+        ],
+        max_tokens: 1000,
+      });
+
+      const raw = response.output?.trim() || '{}';
+      let extracted: { topic?: string; description?: string; formulas?: string[] };
+      try {
+        const clean = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+        extracted = JSON.parse(clean);
+      } catch {
+        extracted = { topic: '', description: raw, formulas: [] };
+      }
+
+      return NextResponse.json({ extracted, stage: 'whiteboard_extract_complete' });
+    }
+
+    // ── Step: voice_parse (LLM parses spoken command into form fields) ─────────
+    if (step === 'voice_parse') {
+      const { transcript } = body as { transcript?: string };
+      const cleanTranscript = (transcript || '').trim();
+      if (!cleanTranscript) {
+        return NextResponse.json(
+          { error: 'Transkript boş geldi. Mikrofon sesini yakalayamadı.' },
+          { status: 400 }
+        );
+      }
+
+      // Defensive: surface a friendly message if Fal isn't configured rather
+      // than letting falRequest throw a generic "FAL_KEY is not configured".
+      if (!process.env.FAL_KEY && !process.env.NEXT_PUBLIC_FAL_KEY) {
+        console.error('[voice_parse] FAL_KEY missing in environment');
+        return NextResponse.json(
+          { error: 'AI servisi yapılandırılmamış (FAL_KEY). Lütfen yöneticiyle iletişime geç.' },
+          { status: 503 }
+        );
+      }
+
+      const subjects = [
+        'Matematik', 'Fizik', 'Kimya', 'Biyoloji', 'Türkçe',
+        'Edebiyat', 'Tarih', 'Coğrafya', 'İngilizce', 'Fen Bilimleri',
+      ];
+
+      const parsePrompt =
+        `Parse the following Turkish teacher's voice command into lesson creation form fields.\n` +
+        `Voice command: "${cleanTranscript}"\n\n` +
+        `Return ONLY a JSON object (no markdown). Include only fields you can confidently extract:\n` +
+        `{"subject": one of [${subjects.map((s) => `"${s}"`).join(', ')}] | null,` +
+        `"grade": one of ["5","6","7","8","9","10","11","12"] | null,` +
+        `"topic": "short lesson topic (max 60 chars)" | null,` +
+        `"description": "detailed lesson description (100-400 chars)" | null,` +
+        `"tone": "formal"|"friendly"|"energetic" | null}`;
+
+      let response: { output: string };
+      try {
+        response = await falRequest<{ output: string }>('fal-ai/any-llm', {
+          prompt: parsePrompt,
+          model: 'google/gemini-2.5-flash-lite',
+          max_tokens: 500,
+          temperature: 0.1,
+        });
+      } catch (e) {
+        console.error('[voice_parse] Fal request failed:', e);
+        return NextResponse.json(
+          { error: `AI servisi yanıt vermedi: ${e instanceof Error ? e.message : 'unknown'}` },
+          { status: 502 }
+        );
+      }
+
+      const raw = (response.output || '').trim() || '{}';
+      let parsed: Record<string, string | null>;
+      try {
+        const clean = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+        parsed = JSON.parse(clean);
+      } catch (e) {
+        console.warn('[voice_parse] LLM output not valid JSON:', raw.slice(0, 200), e);
+        parsed = {};
+      }
+
+      return NextResponse.json({ parsed, stage: 'voice_parse_complete' });
+    }
+
     return NextResponse.json(
       {
-        error: `Unknown step: ${step}. Use 'slides', 'tts_slide', 'tts_batch', 'lipsync', 'demo_content', 'bunny_ingest_batch', 'manim_code', 'manim_render', 'rag_retrieve', 'regenerate_slide', or 'generate_quiz'.`,
+        error: `Unknown step: ${step}. Use 'outline', 'materialize_slide', 'slides', 'tts_slide', 'tts_batch', 'lipsync', 'demo_content', 'bunny_ingest_batch', 'manim_code', 'manim_render', 'rag_retrieve', 'regenerate_slide', 'generate_quiz', 'whiteboard_extract', or 'voice_parse'.`,
       },
       { status: 400 }
     );

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
 import { Check, Search, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -38,6 +38,30 @@ export function KazanimPicker({
   compact = false,
 }: KazanimPickerProps) {
   const [search, setSearch] = useState('');
+  const listRef = useRef<HTMLDivElement>(null);
+
+  // Prevent page scroll from stealing wheel events while the list is scrollable.
+  // Needs a non-passive listener so preventDefault() actually works.
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+
+    const onWheel = (e: WheelEvent) => {
+      const { scrollTop, scrollHeight, clientHeight } = el;
+      const isScrollable = scrollHeight > clientHeight;
+      if (!isScrollable) return;
+
+      const atTop = scrollTop === 0 && e.deltaY < 0;
+      const atBottom = scrollTop + clientHeight >= scrollHeight - 1 && e.deltaY > 0;
+      if (!atTop && !atBottom) {
+        e.preventDefault();
+        el.scrollTop += e.deltaY;
+      }
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
 
   const isCovered = isCatalogCovered(subject, grade);
   const all = useMemo(
@@ -139,14 +163,16 @@ export function KazanimPicker({
 
       {/* Grouped list */}
       <div
+        ref={listRef}
         className={cn(
-          'rounded-lg border border-border bg-card overflow-y-auto',
+          'rounded-lg border border-border bg-card overflow-y-scroll overscroll-contain',
           compact ? 'max-h-56' : 'max-h-80'
         )}
+        style={{ WebkitOverflowScrolling: 'touch' }}
       >
         {[...grouped.entries()].map(([unit, items]) => (
           <div key={unit} className="border-b border-border last:border-b-0">
-            <div className="px-3 py-1.5 bg-muted/40 text-[11px] font-medium text-muted-foreground sticky top-0">
+            <div className="px-3 py-1.5 bg-card text-[11px] font-medium text-muted-foreground sticky top-0 z-10 border-b border-border/50">
               {unit}
             </div>
             {items.map((k) => {
