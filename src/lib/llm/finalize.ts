@@ -95,7 +95,7 @@ export async function finalizeServerSide(opts: FinalizeServerOptions): Promise<v
     // ── Load current slides_data ───────────────────────────────────────────
     const { data: videoRow, error: readErr } = await sb
       .from('videos')
-      .select('slides_data, teacher_id')
+      .select('slides_data, teacher_id, voice_mode')
       .eq('id', videoId)
       .maybeSingle();
 
@@ -104,6 +104,11 @@ export async function finalizeServerSide(opts: FinalizeServerOptions): Promise<v
 
     const workingSlides: Slide[] = videoRow.slides_data.slides.map((s: Slide) => ({ ...s }));
     const totalSlides = workingSlides.length;
+    const teacherId: string | undefined = videoRow.teacher_id;
+    // Default to 'teacher' so legacy rows (NULL voice_mode) keep using the
+    // cloned voice when available — robot must be opted INTO explicitly.
+    const voiceMode: 'teacher' | 'robot' =
+      videoRow.voice_mode === 'robot' ? 'robot' : 'teacher';
 
     await sb.from('videos').update({
       status: 'processing',
@@ -132,7 +137,10 @@ export async function finalizeServerSide(opts: FinalizeServerOptions): Promise<v
         continue;
       }
       try {
-        const { audio_url } = await textToSpeech(slide.narrationText, language);
+        const { audio_url } = await textToSpeech(slide.narrationText, language, {
+          teacherId,
+          voiceMode,
+        });
         if (audio_url) {
           slide.audioUrl = audio_url;
           slide.narrationDirtyAt = undefined;

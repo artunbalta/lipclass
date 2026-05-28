@@ -7,16 +7,24 @@
 // pipeline.
 //
 // Body params:
-//   { language: 'tr'|'en', tone: 'formal'|'friendly'|'energetic', variantLabel: string,
-//     translateNarration?: boolean }   // (translateNarration flag reserved for future LLM call)
+//   { language: 'tr'|'en', tone: 'formal'|'friendly'|'energetic',
+//     variantLabel: string,
+//     translateNarration?: boolean }
+//
+// When translateNarration=true AND the target language differs from the
+// parent's, every slide is sent through the LLM translator (per-slide,
+// concurrency-limited). KaTeX, Mermaid, units, and variable names are
+// preserved verbatim. Quiz options keep their order so correctAnswer is
+// still valid. See src/lib/llm/translate.ts for details.
 //
 // Auth: only the parent video's owner can derive from it.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { translateSlides, type TranslationLanguage } from '@/lib/llm/translate';
 import type { Slide } from '@/types';
 
-export const maxDuration = 60;
+export const maxDuration = 180; // up to 10 slides × ~5-10s translate each
 
 export async function POST(
   request: NextRequest,
@@ -41,6 +49,7 @@ export async function POST(
   const language = (body.language as 'tr' | 'en') || 'tr';
   const tone = (body.tone as 'formal' | 'friendly' | 'energetic') || 'friendly';
   const variantLabel: string = (body.variantLabel || '').toString().trim();
+  const translateNarration: boolean = body.translateNarration === true;
 
   if (!variantLabel) {
     return NextResponse.json({ error: 'variantLabel is required' }, { status: 400 });
@@ -81,6 +90,8 @@ export async function POST(
       content: s.content,
       bulletPoints: [...(s.bulletPoints || [])],
       narrationText: s.narrationText,
+      intent: s.intent,
+      visualHint: s.visualHint,
     };
     if (s.slideType === 'quiz' && s.quiz) {
       copy.slideType = 'quiz';
@@ -89,7 +100,21 @@ export async function POST(
     return copy;
   });
 
-  // Build a derivative title that's distinguishable
+  // Translate slides when the target language differs from the parent and
+  // the caller explicitly asked for it. This is the expensive step (~10s ×
+  // slide count parallel) so it gates on the flag.
+  const parentLanguage = (parent.language as TranslationLanguage | null) ?? 'tr';
+  const needsTranslation =
+    translateNarration && language !== parentLanguage;
+
+  const finalSlides: Slide[] = needsTranslation
+    ? await translateSlides(copiedSlides, language as TranslationLanguage)
+    : copiedSlides;
+
+  // Build a derivative title that's distinguishable. We also translate the
+  // title itself when translation was requested — using a thin prompt would
+  // be overkill for ~5 words, so just keep the parent title + variantLabel
+  // and rely on the slide-1 title (which IS translated) to convey the topic.
   const baseTitle: string = parent.title || 'Ders';
   const derivedTitle = `${baseTitle} — ${variantLabel}`.slice(0, 200);
 
@@ -114,7 +139,7 @@ export async function POST(
       difficulty: parent.difficulty,
       estimated_duration: parent.estimated_duration,
       language,
-      slides_data: { slides: copiedSlides },
+      slides_data: { slides: finalSlides },
       parent_video_id: parentId,
       variant_label: variantLabel,
       curriculum_codes: parent.curriculum_codes || [],
@@ -132,6 +157,9 @@ export async function POST(
     variantLabel,
     language,
     tone,
-    message: 'Derivative created in slides_ready state — open the editor to review and finalize.',
+    translated: needsTranslation,
+    message: needsTranslation
+      ? 'Derivative created and translated — open the editor to review and finalize.'
+      : 'Derivative created in slides_ready state — open the editor to review and finalize.',
   });
 }

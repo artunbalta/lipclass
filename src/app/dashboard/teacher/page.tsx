@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Video, Eye, Users, TrendingUp, Plus, ArrowRight } from 'lucide-react';
@@ -9,14 +9,42 @@ import { StatsCard, VideoCard } from '@/components/dashboard';
 import { useAuthStore } from '@/stores/auth-store';
 import { useVideoStore } from '@/stores/video-store';
 import { Skeleton } from '@/components/ui/skeleton';
+import { halfTrend } from '@/lib/analytics/half-trend';
+
+// Shape we need from /api/teacher/analytics — only the fields we read here.
+interface DashboardTrendsResponse {
+  totals?: { totalViews?: number; studentCount?: number };
+  trend?: {
+    views?: Array<{ value: number }>;
+  };
+}
 
 export default function TeacherDashboardPage() {
   const { user } = useAuthStore();
   const { videos, stats, isLoading, fetchVideos } = useVideoStore();
+  const [viewsTrend, setViewsTrend] = useState<{ value: number; isPositive: boolean } | undefined>();
 
   useEffect(() => {
     fetchVideos();
   }, [fetchVideos]);
+
+  // Pull a real weekly trend for the "views" card so the +%X badge actually
+  // means something. We deliberately use 'week' so the % move is fresh; the
+  // full analytics page covers month/year.
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/teacher/analytics?range=week')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: DashboardTrendsResponse | null) => {
+        if (cancelled || !d?.trend?.views?.length) return;
+        const computed = halfTrend(d.trend.views.map((b) => b.value));
+        if (computed) setViewsTrend(computed);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const recentVideos = videos.slice(0, 4);
 
@@ -46,14 +74,13 @@ export default function TeacherDashboardPage() {
           title="Toplam Video"
           value={stats.totalVideos}
           icon={Video}
-          trend={{ value: 12, isPositive: true }}
           color="primary"
         />
         <StatsCard
           title="Toplam İzlenme"
           value={stats.totalViews.toLocaleString()}
           icon={Eye}
-          trend={{ value: 8, isPositive: true }}
+          trend={viewsTrend}
           color="accent"
         />
         <StatsCard

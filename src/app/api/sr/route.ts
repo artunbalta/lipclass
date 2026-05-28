@@ -4,9 +4,13 @@
 // GET  /api/sr?action=difficulty   → { suggestedDifficulty, successRate, totalAttempts }
 // POST /api/sr                     → upsert an sr_item (called on wrong quiz answer)
 // POST /api/sr?action=review       → record review quality, update SM-2 state
+//
+// The scheduling math lives in @/lib/sr/sm2 so it can be unit-tested
+// without a Supabase mock.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { applySm2, type SrQuality } from '@/lib/sr/sm2';
 
 export interface SrItem {
   id: string;
@@ -24,40 +28,8 @@ export interface SrItem {
   lastReviewedAt?: string;
 }
 
-// SM-2 algorithm
-function sm2(
-  easeFactor: number,
-  interval: number,
-  repetitions: number,
-  quality: number // 1=wrong, 3=hard, 5=easy
-): { easeFactor: number; intervalDays: number; repetitions: number; dueDate: string } {
-  let newEF = easeFactor + 0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02);
-  newEF = Math.max(1.3, newEF);
-
-  let newInterval: number;
-  let newRep: number;
-
-  if (quality >= 3) {
-    if (repetitions === 0) newInterval = 1;
-    else if (repetitions === 1) newInterval = 6;
-    else newInterval = Math.round(interval * easeFactor);
-    newRep = repetitions + 1;
-  } else {
-    newInterval = 1;
-    newRep = 0;
-    newEF = easeFactor; // EF stays the same on failure (reset repetitions only)
-  }
-
-  const due = new Date();
-  due.setDate(due.getDate() + newInterval);
-
-  return {
-    easeFactor: newEF,
-    intervalDays: newInterval,
-    repetitions: newRep,
-    dueDate: due.toISOString().split('T')[0],
-  };
-}
+// SM-2 algorithm lives in @/lib/sr/sm2. Kept out of this route file so it
+// can be unit-tested in isolation.
 
 export async function GET(request: NextRequest) {
   const sb = await createClient();
@@ -167,7 +139,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'SR item not found' }, { status: 404 });
     }
 
-    const result = sm2(item.ease_factor, item.interval_days, item.repetitions, quality);
+    const result = applySm2(
+      {
+        easeFactor: item.ease_factor,
+        intervalDays: item.interval_days,
+        repetitions: item.repetitions,
+      },
+      quality as SrQuality,
+    );
 
     const { error: updateErr } = await sb
       .from('sr_items')

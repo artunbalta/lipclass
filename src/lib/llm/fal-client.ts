@@ -6,14 +6,15 @@ export const FAL_API_BASE = 'https://fal.run';
 export const FAL_QUEUE_BASE = 'https://queue.fal.run';
 
 /**
- * Get the Fal API key from env (server-side only).
- * NOTE: still accepts NEXT_PUBLIC_FAL_KEY as fallback for backward compat.
- * Security backlog: drop the NEXT_PUBLIC_* fallback so keys never reach the client.
+ * Get the Fal API key from env. SERVER-ONLY — the NEXT_PUBLIC_* fallback
+ * was removed on 2026-05-27 because it shipped the key in the client bundle.
+ * Any client code that previously relied on this must call the server route
+ * (/api/generate-video) instead.
  */
 export function getFalApiKey(): string {
-  const key = process.env.FAL_KEY || process.env.NEXT_PUBLIC_FAL_KEY;
+  const key = process.env.FAL_KEY;
   if (!key) {
-    throw new Error('FAL_KEY is not configured');
+    throw new Error('FAL_KEY is not configured (server-only env var)');
   }
   return key;
 }

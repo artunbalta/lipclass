@@ -27,10 +27,13 @@ export interface LipsyncResponse {
 }
 
 /**
- * Get Fal AI API key from environment
+ * Get Fal AI API key from environment. SERVER-ONLY — the NEXT_PUBLIC_*
+ * fallback was removed to keep the key out of the client bundle. This file
+ * is dead code (no importers — verified `grep -rln "@/lib/api/fal"`) and
+ * kept only until callers are confirmed gone.
  */
 function getApiKey(): string {
-  const key = process.env.NEXT_PUBLIC_FAL_KEY || process.env.FAL_KEY;
+  const key = process.env.FAL_KEY;
   if (!key) {
     throw new Error('FAL_KEY is not configured. Please add it to your environment variables.');
   }
@@ -211,7 +214,7 @@ export async function createLipsyncVideo(
  */
 export function isFalConfigured(): boolean {
   try {
-    const key = process.env.NEXT_PUBLIC_FAL_KEY || process.env.FAL_KEY;
+    const key = process.env.FAL_KEY;
     return !!key && key !== 'your_fal_ai_api_key' && key.length > 0;
   } catch {
     return false;

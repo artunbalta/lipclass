@@ -26,7 +26,7 @@ Proje kök dizininde `.env.local` dosyası oluşturun veya mevcut dosyaya ekleyi
 
 ```env
 # Fal AI API Key (server-side only)
-FAL_KEY=7dcf629c-939b-48d3-ba96-299fd859f478:c86206360cf31e2cfdf23665972961dc
+FAL_KEY=REDACTED_ROTATE_BEFORE_USING
 ```
 
 **ÖNEMLİ:** 

@@ -79,6 +79,10 @@ export default function VideoDetailPage() {
   const [deriveLanguage, setDeriveLanguage] = useState<'tr' | 'en'>('en');
   const [deriveTone, setDeriveTone] = useState<'formal' | 'friendly' | 'energetic'>('friendly');
   const [deriveLabel, setDeriveLabel] = useState('İngilizce');
+  // Translate slides via LLM when the target language differs. Default to true
+  // so the common case (TR → EN) just works; teachers can opt out if they
+  // prefer to translate manually in the editor.
+  const [deriveTranslate, setDeriveTranslate] = useState(true);
   const [deriving, setDeriving] = useState(false);
 
   useEffect(() => {
@@ -145,7 +149,12 @@ export default function VideoDetailPage() {
       const resp = await fetch(`/api/videos/${selectedVideo.id}/derive`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ language: deriveLanguage, tone: deriveTone, variantLabel: label }),
+        body: JSON.stringify({
+          language: deriveLanguage,
+          tone: deriveTone,
+          variantLabel: label,
+          translateNarration: deriveTranslate,
+        }),
       });
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
@@ -604,9 +613,32 @@ export default function VideoDetailPage() {
               </div>
             </div>
 
+            {/* Auto-translate — only meaningful when language differs from parent */}
+            {selectedVideo.language && selectedVideo.language !== deriveLanguage && (
+              <label className="flex items-start gap-3 p-3 rounded-lg border border-border bg-muted/30 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={deriveTranslate}
+                  onChange={(e) => setDeriveTranslate(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded border-input text-primary"
+                />
+                <div className="flex-1">
+                  <p className="text-sm font-medium">
+                    Anlatımı otomatik çevir ({selectedVideo.language?.toUpperCase()} → {deriveLanguage.toUpperCase()})
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Slayt başlıkları, içerik, bullet ve narration LLM ile çevrilir.
+                    Matematik (KaTeX), Mermaid diyagramları ve quiz seçenek sırası korunur.
+                    Kapatırsan slaytlar parent dilinde kalır — editörde elle çevirirsin.
+                  </p>
+                </div>
+              </label>
+            )}
+
             <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900">
-              💡 Versiyon "slides_ready" durumunda oluşacak. Anlatımı yeni dile çevirip
-              kaydet, sonra "Onayla ve Üret" ile sesi/lipsync'i üret.
+              💡 Versiyon "slides_ready" durumunda oluşacak. Otomatik çeviri açıksa
+              metin yeni dilde gelir; yine de editörde gözden geçir, sonra "Onayla ve
+              Üret" ile sesi/lipsync'i üret.
             </div>
           </div>
 

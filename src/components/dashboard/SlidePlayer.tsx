@@ -82,6 +82,16 @@ export default function SlidePlayer({
   const isPlayingRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // ── Engagement tracking ──
+  // sessionId is the video_analytics row id this watch session is bound to.
+  // watchedRef accumulates seconds the playhead actually advanced; we PATCH
+  // the row every 5s and on the completion event. Both are non-blocking;
+  // failures are logged but never interrupt playback.
+  const sessionIdRef = useRef<string | null>(null);
+  const watchedRef = useRef(0);
+  const lastFlushedRef = useRef(0);
+  const completedRef = useRef(false);
+
   const slides = slidesData.slides;
   const currentSlide = slides[currentSlideIndex];
   const totalSlides = slides.length;
@@ -242,6 +252,111 @@ export default function SlidePlayer({
       if (videoRef.current) videoRef.current.muted = true;
     }
   }, [isMuted, hasLipsync]);
+
+  // ── Engagement tracking ──
+  // Start a video_analytics session on mount; flush watched_duration every 5s
+  // while playing; mark completed=true when the last slide audio/video ends.
+  // No-op when videoId is omitted (editor preview never logs analytics).
+  useEffect(() => {
+    if (!videoId) return;
+    let cancelled = false;
+
+    /* eslint-disable react-hooks/set-state-in-effect */
+    (async () => {
+      try {
+        const res = await fetch('/api/video-analytics', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ videoId }),
+        });
+        if (!res.ok || cancelled) return;
+        const { sessionId } = (await res.json()) as { sessionId: string };
+        if (!cancelled) sessionIdRef.current = sessionId;
+      } catch (err) {
+        // Analytics must never break playback.
+        console.warn('[SlidePlayer] analytics start failed:', err);
+      }
+    })();
+    /* eslint-enable react-hooks/set-state-in-effect */
+
+    return () => {
+      cancelled = true;
+      // Final flush on unmount — sendBeacon survives navigation.
+      const sid = sessionIdRef.current;
+      if (!sid) return;
+      const payload = JSON.stringify({
+        sessionId: sid,
+        watchedDuration: watchedRef.current,
+        completed: completedRef.current,
+      });
+      try {
+        if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+          navigator.sendBeacon(
+            '/api/video-analytics',
+            new Blob([payload], { type: 'application/json' }),
+          );
+        } else {
+          fetch('/api/video-analytics', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: payload,
+            keepalive: true,
+          }).catch(() => {});
+        }
+      } catch {
+        /* noop */
+      }
+    };
+  }, [videoId]);
+
+  // Per-second tick while playing — accumulate watched time, PATCH every 5s.
+  useEffect(() => {
+    if (!videoId || !isPlaying) return;
+
+    const tick = setInterval(() => {
+      watchedRef.current += 1;
+      const delta = watchedRef.current - lastFlushedRef.current;
+      if (delta >= 5 && sessionIdRef.current) {
+        lastFlushedRef.current = watchedRef.current;
+        fetch('/api/video-analytics', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: sessionIdRef.current,
+            watchedDuration: watchedRef.current,
+          }),
+        }).catch(() => {});
+      }
+    }, 1000);
+
+    return () => clearInterval(tick);
+  }, [videoId, isPlaying]);
+
+  // Mark completion when the LAST slide's media reaches end.
+  useEffect(() => {
+    const primary = hasLipsync ? videoRef.current : audioRef.current;
+    if (!primary || !videoId) return;
+
+    const onEndedComplete = () => {
+      if (currentSlideIndex === totalSlides - 1 && !completedRef.current) {
+        completedRef.current = true;
+        if (sessionIdRef.current) {
+          fetch('/api/video-analytics', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sessionId: sessionIdRef.current,
+              watchedDuration: watchedRef.current,
+              completed: true,
+            }),
+          }).catch(() => {});
+        }
+      }
+    };
+
+    primary.addEventListener('ended', onEndedComplete);
+    return () => primary.removeEventListener('ended', onEndedComplete);
+  }, [currentSlideIndex, totalSlides, hasLipsync, videoId]);
 
   // ── In fallback mode, sync video play/pause with audio ──
   useEffect(() => {

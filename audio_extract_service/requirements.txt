@@ -1,0 +1,4 @@
+modal>=0.73.0
+# fastapi + httpx ship via the Modal image .pip_install — listed here only for
+# local lint / IDE awareness. Do NOT add ffmpeg-python: we call ffmpeg via
+# subprocess to keep the dependency footprint small.

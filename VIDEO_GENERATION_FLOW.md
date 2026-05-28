@@ -204,7 +204,7 @@ const sorted = data.sort((a, b) =>
 ### Environment Variables Kontrolü:
 ```bash
 # .env.local dosyasında olmalı:
-FAL_KEY=7dcf629c-939b-48d3-ba96-299fd859f478:c86206360cf31e2cfdf23665972961dc
+FAL_KEY=REDACTED_ROTATE_BEFORE_USING
 NEXT_PUBLIC_SUPABASE_URL=https://...
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 ```

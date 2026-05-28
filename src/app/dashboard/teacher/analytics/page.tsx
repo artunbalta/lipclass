@@ -9,9 +9,9 @@ import {
   Clock,
   Users,
   Video,
-  Calendar,
   Download,
   Share2,
+  Check,
   Loader2,
   ChevronDown,
   ChevronRight,
@@ -23,6 +23,7 @@ import { StatsCard } from '@/components/dashboard';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useVideoStore } from '@/stores/video-store';
 import { cn } from '@/lib/utils';
+import { showToast } from '@/lib/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { computeCoverage, findByCode } from '@/lib/curriculum/meb-catalog';
 
@@ -97,10 +98,10 @@ export default function TeacherAnalyticsPage() {
   useEffect(() => {
     let cancelled = false;
     const ctrl = new AbortController();
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    /* eslint-disable react-hooks/set-state-in-effect */
     setAnalyticsLoading(true);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAnalyticsError(null);
+    /* eslint-enable react-hooks/set-state-in-effect */
     fetch(`/api/teacher/analytics?range=${timeRange}`, { signal: ctrl.signal })
       .then(async (r) => {
         if (!r.ok) {
@@ -202,6 +203,100 @@ export default function TeacherAnalyticsPage() {
   const insightTop = topVideos[0];
   const insightAvgWatch = totals?.avgWatchSeconds ?? 0;
 
+  // ── CSV export + share ───────────────────────────────────────────────────
+  const [shareCopied, setShareCopied] = useState(false);
+
+  const handleDownloadReport = useCallback(() => {
+    if (!analytics) {
+      showToast.error('Henüz veri yok', 'Analiz yüklendikten sonra deneyin.');
+      return;
+    }
+    // CSV is wider than PDF for spreadsheet teachers — keep it simple, no PDF lib.
+    const rangeLabel =
+      timeRange === 'week' ? 'Haftalik' : timeRange === 'month' ? 'Aylik' : 'Yillik';
+    const today = new Date().toISOString().slice(0, 10);
+
+    const escape = (val: string | number | null | undefined): string => {
+      const s = val === null || val === undefined ? '' : String(val);
+      // RFC 4180 — wrap in quotes if contains comma/newline/quote, escape quotes
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+
+    const lines: string[] = [];
+    lines.push(`# Chalk Analytics Report — ${rangeLabel} — ${today}`);
+    lines.push('');
+    lines.push('## Ozet');
+    lines.push('Metrik,Deger');
+    lines.push(`Toplam İzlenme,${analytics.totals.totalViews}`);
+    lines.push(`Toplam Video,${analytics.totals.totalVideos}`);
+    lines.push(`Öğrenci Sayısı,${analytics.totals.studentCount}`);
+    lines.push(`Tamamlama Oranı,%${analytics.totals.completionRate}`);
+    lines.push(`Ortalama İzlenme (sn),${analytics.totals.avgWatchSeconds}`);
+    lines.push(`Beğeni Oranı,%${analytics.totals.likeRate}`);
+    if (analytics.totals.quizAvgScore !== null) {
+      lines.push(`Quiz Ortalaması,%${analytics.totals.quizAvgScore}`);
+    }
+    lines.push(`Quiz Denemeleri,${analytics.totals.quizAttempts}`);
+    lines.push('');
+    lines.push('## İzlenme Trendi');
+    lines.push('Periyot,İzlenme,Tamamlama %');
+    for (let i = 0; i < analytics.trend.views.length; i++) {
+      const v = analytics.trend.views[i];
+      const c = analytics.trend.completion[i];
+      lines.push(`${escape(v.label)},${v.value},${c?.value ?? ''}`);
+    }
+    lines.push('');
+    lines.push('## En İyi Videolar');
+    lines.push('Başlık,İzlenme,Tamamlama %,Beğeni,Trend');
+    for (const tv of analytics.topVideos) {
+      lines.push(
+        [
+          escape(tv.title),
+          tv.views,
+          tv.completionRate,
+          tv.likeCount,
+          tv.trend,
+        ].join(','),
+      );
+    }
+
+    // UTF-8 BOM so Excel opens Turkish characters correctly.
+    const csv = '﻿' + lines.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `chalk-analytics-${rangeLabel.toLowerCase()}-${today}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showToast.success('Rapor indirildi', `${a.download}`);
+  }, [analytics, timeRange]);
+
+  const handleShare = useCallback(async () => {
+    const url = typeof window !== 'undefined' ? window.location.href : '';
+    const text = analytics?.totals
+      ? `Chalk: ${analytics.totals.totalViews} izlenme, ${analytics.totals.studentCount} öğrenci · ${timeRange}`
+      : 'Chalk analitik özetim';
+    try {
+      const navWithShare = navigator as Navigator & {
+        share?: (data: ShareData) => Promise<void>;
+      };
+      if (navWithShare.share) {
+        await navWithShare.share({ title: 'Chalk Analytics', text, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setShareCopied(true);
+      showToast.success('Link kopyalandı', 'Bu sayfanın URL\'si panoda.');
+      setTimeout(() => setShareCopied(false), 2500);
+    } catch {
+      // User cancelled share sheet — silent.
+    }
+  }, [analytics, timeRange]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -213,13 +308,22 @@ export default function TeacherAnalyticsPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDownloadReport}
+            disabled={!analytics}
+          >
             <Download className="w-4 h-4 mr-2" />
             Rapor İndir
           </Button>
-          <Button variant="outline" size="sm">
-            <Share2 className="w-4 h-4 mr-2" />
-            Paylaş
+          <Button variant="outline" size="sm" onClick={handleShare}>
+            {shareCopied ? (
+              <Check className="w-4 h-4 mr-2 text-emerald-500" />
+            ) : (
+              <Share2 className="w-4 h-4 mr-2" />
+            )}
+            {shareCopied ? 'Kopyalandı' : 'Paylaş'}
           </Button>
         </div>
       </div>

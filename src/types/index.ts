@@ -5,7 +5,25 @@ export interface User {
   name: string;
   role: 'teacher' | 'student';
   avatar?: string;
+  /**
+   * Free-form school name kept for backwards compatibility. Display only —
+   * use `schoolId` for any "members at THIS school" query. See
+   * supabase/add-schools.sql for the migration that introduced school_id.
+   */
   school?: string;
+  schoolId?: string;
+  createdAt: Date;
+}
+
+// Tenant
+export interface School {
+  id: string;
+  name: string;
+  slug: string;
+  city?: string;
+  district?: string;
+  plan?: string;
+  maxTeachers?: number;
   createdAt: Date;
 }
 
@@ -121,6 +139,10 @@ export interface SlidesData {
   outline?: SlideOutline[]; // Pass 1 output; persisted so editor can render
 }
 
+// Voice mode for a video — controls whether TTS uses the teacher's cloned
+// voice (when available) or the generic fal.ai voice ("robot").
+export type VoiceMode = 'teacher' | 'robot';
+
 // Video Types
 export interface Video {
   id: string;
@@ -152,6 +174,7 @@ export interface Video {
   variantLabel?: string;           // Human label, e.g. 'İngilizce', 'İlkokul'
   language?: 'tr' | 'en';          // Stored in DB; used for variant differentiation
   tone?: 'formal' | 'friendly' | 'energetic';
+  voiceMode?: VoiceMode;           // 'teacher' uses cloned voice, 'robot' uses fal fallback
   generationProgress?: {
     stage: string;
     progress: number;              // 0-100
@@ -185,6 +208,7 @@ export interface CreateVideoFormData {
   estimatedDuration: number;
   language: 'tr' | 'en';
   curriculumCodes?: string[];
+  voiceMode?: VoiceMode;
 }
 
 // Testimonial Type

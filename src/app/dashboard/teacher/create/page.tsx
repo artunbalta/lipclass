@@ -14,6 +14,8 @@ import {
   Library,
   Mic,
   MicOff,
+  Mic2,
+  Bot,
   Camera,
   X,
   Layers,
@@ -62,6 +64,7 @@ const createVideoSchema = z.object({
   sourceOnly: z.boolean(),
   sourceDocumentIds: z.array(z.string()),
   curriculumCodes: z.array(z.string()),
+  voiceMode: z.enum(['teacher', 'robot']),
 });
 
 type CreateVideoForm = z.infer<typeof createVideoSchema>;
@@ -274,6 +277,19 @@ export default function CreateVideoPage() {
 
   useEffect(() => { fetchTeacherDocs(); }, [fetchTeacherDocs]);
 
+  // ── Voice clone status — drives the "Kendi sesim / Robot" toggle ──────────
+  // hasTeacherVoice=null → still loading; false → no clone (lock to robot);
+  // true → clone exists, teacher can pick either mode.
+  const [hasTeacherVoice, setHasTeacherVoice] = useState<boolean | null>(null);
+  useEffect(() => {
+    fetch('/api/teacher/voice-clone')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { hasActiveClone?: boolean } | null) => {
+        setHasTeacherVoice(!!d?.hasActiveClone);
+      })
+      .catch(() => setHasTeacherVoice(false));
+  }, []);
+
   // ── Form ─────────────────────────────────────────────────────────────────────
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<CreateVideoForm>({
     resolver: zodResolver(createVideoSchema),
@@ -292,9 +308,17 @@ export default function CreateVideoPage() {
       sourceOnly: false,
       sourceDocumentIds: [],
       curriculumCodes: [],
+      voiceMode: 'teacher',
     },
   });
   const watchAll = watch();
+
+  // Lock voiceMode to 'robot' once we know the teacher has no active clone.
+  useEffect(() => {
+    if (hasTeacherVoice === false) {
+      setValue('voiceMode', 'robot');
+    }
+  }, [hasTeacherVoice, setValue]);
 
   // ── Voice input ──────────────────────────────────────────────────────────────
   const topicVoice = useVoiceInput({
@@ -421,6 +445,7 @@ export default function CreateVideoPage() {
             estimatedDuration: data.estimatedDuration,
             language: data.language,
             curriculumCodes: data.curriculumCodes,
+            voiceMode: data.voiceMode,
           };
           const video = await createVideo(videoData);
           setBatchStatus((prev) =>
@@ -474,6 +499,7 @@ export default function CreateVideoPage() {
         estimatedDuration: data.estimatedDuration,
         language: data.language,
         curriculumCodes: data.curriculumCodes,
+        voiceMode: data.voiceMode,
       };
 
       const video = await createVideo(videoData);
@@ -1194,6 +1220,62 @@ export default function CreateVideoPage() {
                         🇬🇧 İngilizce
                       </Button>
                     </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* Voice mode */}
+                  <div className="space-y-2">
+                    <Label>Anlatım Sesi</Label>
+                    {hasTeacherVoice === null ? (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        Klon durumu kontrol ediliyor...
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          disabled={!hasTeacherVoice}
+                          onClick={() => setValue('voiceMode', 'teacher')}
+                          className={cn(
+                            'flex items-start gap-3 p-3 rounded-lg border text-left transition-all',
+                            watchAll.voiceMode === 'teacher'
+                              ? 'border-primary bg-primary/5'
+                              : 'border-border hover:border-primary/40',
+                            !hasTeacherVoice && 'opacity-50 cursor-not-allowed',
+                          )}
+                        >
+                          <Mic2 className="w-5 h-5 text-primary mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-sm font-medium">Kendi Sesim</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {hasTeacherVoice
+                                ? 'Klonlanan sesin kullanılacak'
+                                : 'Önce Referans Video sayfasından sesini klonla'}
+                            </p>
+                          </div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setValue('voiceMode', 'robot')}
+                          className={cn(
+                            'flex items-start gap-3 p-3 rounded-lg border text-left transition-all',
+                            watchAll.voiceMode === 'robot'
+                              ? 'border-primary bg-primary/5'
+                              : 'border-border hover:border-primary/40',
+                          )}
+                        >
+                          <Bot className="w-5 h-5 text-primary mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-sm font-medium">Robot Ses</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Generic AI sesi (ücretsiz, hızlı)
+                            </p>
+                          </div>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

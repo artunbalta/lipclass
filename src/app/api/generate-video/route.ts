@@ -483,7 +483,7 @@ Rules:
 
       // Defensive: surface a friendly message if Fal isn't configured rather
       // than letting falRequest throw a generic "FAL_KEY is not configured".
-      if (!process.env.FAL_KEY && !process.env.NEXT_PUBLIC_FAL_KEY) {
+      if (!process.env.FAL_KEY) {
         console.error('[voice_parse] FAL_KEY missing in environment');
         return NextResponse.json(
           { error: 'AI servisi yapılandırılmamış (FAL_KEY). Lütfen yöneticiyle iletişime geç.' },

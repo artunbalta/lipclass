@@ -224,6 +224,7 @@ function mapProfileToUser(profile: any): User {
     role: profile.role as 'teacher' | 'student',
     avatar: profile.avatar_url || undefined,
     school: profile.school || undefined,
+    schoolId: profile.school_id || undefined,
     createdAt: new Date(profile.created_at),
   };
 

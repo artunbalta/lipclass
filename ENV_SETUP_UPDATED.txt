@@ -9,6 +9,6 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
 # Fal AI Configuration (for video generation)
-FAL_KEY=7dcf629c-939b-48d3-ba96-299fd859f478:c86206360cf31e2cfdf23665972961dc
+FAL_KEY=REDACTED_ROTATE_BEFORE_USING
 
 # NOT: FAL_KEY server-side kullanılıyor, NEXT_PUBLIC_ prefix'i kullanmayın

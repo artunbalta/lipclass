@@ -26,7 +26,7 @@
 **Formu doldurun:**
 
 - **Key:** `FAL_KEY`
-- **Value:** `7dcf629c-939b-48d3-ba96-299fd859f478:c86206360cf31e2cfdf23665972961dc`
+- **Value:** `REDACTED_ROTATE_BEFORE_USING`
 - **Environments:** 
   - ☑ **Production**
   - ☑ **Preview** 
@@ -85,7 +85,7 @@ Vercel Dashboard'da environment variables şöyle görünmeli:
 
 ```
 Key                              Value                              Environments
-FAL_KEY                          7dcf629c-939b-48d3-...            Production, Preview, Development
+FAL_KEY                          REDACTED_ROTATE_BEFORE_USING       Production, Preview, Development
 NEXT_PUBLIC_SUPABASE_URL         https://umnuapjlipxxcstgcyzt...   Production, Preview, Development
 NEXT_PUBLIC_SUPABASE_ANON_KEY    eyJhbGciOiJIUzI1NiIs...           Production, Preview, Development
 ```

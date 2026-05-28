@@ -1,25 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { 
-  ArrowLeft, 
-  Play, 
-  Pause,
-  SkipForward,
-  SkipBack,
-  Volume2,
-  VolumeX,
-  Maximize,
+import {
+  ArrowLeft,
+  Play,
   BookmarkPlus,
   BookmarkCheck,
   ThumbsUp,
   Share2,
-  Clock,
-  User,
-  BookOpen,
+  Check,
   ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -31,22 +23,27 @@ import { VideoCard, SlidePlayer } from '@/components/dashboard';
 import { useVideoStore } from '@/stores/video-store';
 import { getReferenceVideoUrl } from '@/lib/api/storage';
 import { formatDuration, formatDate } from '@/lib/mock-data';
+import { showToast } from '@/lib/utils/toast';
 import { cn } from '@/lib/utils';
 
 export default function WatchVideoPage() {
   const params = useParams();
   const router = useRouter();
+  const videoId = params.id as string;
   const { selectedVideo, videos, isLoading, fetchVideoById, fetchVideos } = useVideoStore();
   const [isSaved, setIsSaved] = useState(false);
+  const [savePending, setSavePending] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
+  const [likePending, setLikePending] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
   const [refVideoUrl, setRefVideoUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (params.id) {
-      fetchVideoById(params.id as string);
+    if (videoId) {
+      fetchVideoById(videoId);
       fetchVideos();
     }
-  }, [params.id, fetchVideoById, fetchVideos]);
+  }, [videoId, fetchVideoById, fetchVideos]);
 
   // Fetch reference video URL for the teacher
   useEffect(() => {
@@ -54,6 +51,105 @@ export default function WatchVideoPage() {
       getReferenceVideoUrl(selectedVideo.teacherId).then(setRefVideoUrl).catch(() => {});
     }
   }, [selectedVideo?.teacherId]);
+
+  // Hydrate initial save + like state from the server so the buttons reflect
+  // reality after a refresh / cross-device session.
+  useEffect(() => {
+    if (!videoId) return;
+
+    let cancelled = false;
+    fetch('/api/saved-videos')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { savedVideoIds?: string[] } | null) => {
+        if (cancelled || !d?.savedVideoIds) return;
+        setIsSaved(d.savedVideoIds.includes(videoId));
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [videoId]);
+
+  // Hydrate initial like state — survives reloads and cross-device.
+  useEffect(() => {
+    if (!videoId) return;
+    let cancelled = false;
+    fetch(`/api/videos/${videoId}/like`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { liked?: boolean } | null) => {
+        if (!cancelled && d) setIsLiked(!!d.liked);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [videoId]);
+
+  const handleToggleLike = useCallback(async () => {
+    if (!videoId || likePending) return;
+    const next = !isLiked;
+    setLikePending(true);
+    setIsLiked(next); // optimistic
+    try {
+      const res = await fetch(`/api/videos/${videoId}/like`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ liked: next }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } catch (err) {
+      setIsLiked(!next); // rollback
+      showToast.error('Beğeni kaydedilemedi', err instanceof Error ? err.message : 'Tekrar dene.');
+    } finally {
+      setLikePending(false);
+    }
+  }, [videoId, isLiked, likePending]);
+
+  const handleToggleSave = useCallback(async () => {
+    if (!videoId || savePending) return;
+    setSavePending(true);
+    try {
+      const res = await fetch('/api/saved-videos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ video_id: videoId }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as { saved: boolean };
+      setIsSaved(data.saved);
+    } catch (err) {
+      showToast.error('Kaydedilemedi', err instanceof Error ? err.message : 'Tekrar dene.');
+    } finally {
+      setSavePending(false);
+    }
+  }, [videoId, savePending]);
+
+  const handleShare = useCallback(async () => {
+    if (!selectedVideo) return;
+    const url = typeof window !== 'undefined' ? window.location.href : '';
+    const shareData = {
+      title: selectedVideo.title,
+      text: `${selectedVideo.teacherName} - ${selectedVideo.subject} dersi`,
+      url,
+    };
+    try {
+      // Web Share API where supported (mobile + Safari macOS).
+      const navWithShare = navigator as Navigator & {
+        share?: (data: ShareData) => Promise<void>;
+      };
+      if (navWithShare.share) {
+        await navWithShare.share(shareData);
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setShareCopied(true);
+      showToast.success('Link kopyalandı', 'Arkadaşlarınla paylaşabilirsin.');
+      setTimeout(() => setShareCopied(false), 2500);
+    } catch {
+      // User aborted share sheet or clipboard blocked — silent.
+    }
+  }, [selectedVideo]);
 
   const relatedVideos = videos
     .filter((v) => v.id !== params.id && v.status === 'published')
@@ -138,16 +234,18 @@ export default function WatchVideoPage() {
               variant={isLiked ? 'default' : 'outline'}
               size="sm"
               className="gap-2"
-              onClick={() => setIsLiked(!isLiked)}
+              onClick={handleToggleLike}
+              disabled={likePending}
             >
               <ThumbsUp className={cn('w-4 h-4', isLiked && 'fill-current')} />
-              Beğen
+              {isLiked ? 'Beğenildi' : 'Beğen'}
             </Button>
             <Button
               variant={isSaved ? 'default' : 'outline'}
               size="sm"
               className="gap-2"
-              onClick={() => setIsSaved(!isSaved)}
+              onClick={handleToggleSave}
+              disabled={savePending}
             >
               {isSaved ? (
                 <BookmarkCheck className="w-4 h-4" />
@@ -156,9 +254,9 @@ export default function WatchVideoPage() {
               )}
               {isSaved ? 'Kaydedildi' : 'Kaydet'}
             </Button>
-            <Button variant="outline" size="sm" className="gap-2">
-              <Share2 className="w-4 h-4" />
-              Paylaş
+            <Button variant="outline" size="sm" className="gap-2" onClick={handleShare}>
+              {shareCopied ? <Check className="w-4 h-4 text-emerald-500" /> : <Share2 className="w-4 h-4" />}
+              {shareCopied ? 'Kopyalandı' : 'Paylaş'}
             </Button>
           </div>
 

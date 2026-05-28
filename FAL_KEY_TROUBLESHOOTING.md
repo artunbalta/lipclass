@@ -13,7 +13,7 @@ Vercel'e `FAL_KEY` eklediniz ama hala "FAL_KEY is not configured" hatası alıyo
 **Vercel Dashboard → Settings → Environment Variables** sayfasında kontrol edin:
 
 - [ ] **Key ismi:** `FAL_KEY` (büyük harfler, alt çizgi) ✅
-- [ ] **Value:** `7dcf629c-939b-48d3-ba96-299fd859f478:c86206360cf31e2cfdf23665972961dc` ✅
+- [ ] **Value:** `REDACTED_ROTATE_BEFORE_USING` ✅
 - [ ] **Environments:** ☑ Production ✅
 
 **YANLIŞ örnekler:**

@@ -18,7 +18,7 @@ Vercel'de `NEXT_PUBLIC_FAL_KEY` ekleyin:
 2. **Settings** → **Environment Variables**
 3. **Add New:**
    - **Key:** `NEXT_PUBLIC_FAL_KEY`
-   - **Value:** `7dcf629c-939b-48d3-ba96-299fd859f478:c86206360cf31e2cfdf23665972961dc`
+   - **Value:** `REDACTED_ROTATE_BEFORE_USING`
    - **Environments:** ☑ Production ☑ Preview ☑ Development
 4. **Add** → **Redeploy** (cache işaretlemeden)
 

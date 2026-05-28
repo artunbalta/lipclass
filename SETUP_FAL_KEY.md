@@ -20,7 +20,7 @@ NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 # Fal AI Configuration
-FAL_KEY=7dcf629c-939b-48d3-ba96-299fd859f478:c86206360cf31e2cfdf23665972961dc
+FAL_KEY=REDACTED_ROTATE_BEFORE_USING
 ```
 
 **Not:** `your_supabase_project_url` ve `your_supabase_anon_key` değerlerini Supabase Dashboard'dan aldığınız gerçek değerlerle değiştirin.
@@ -31,7 +31,7 @@ Dosyayı açın ve şu satırı ekleyin (en sona veya uygun bir yere):
 
 ```env
 # Fal AI Configuration
-FAL_KEY=7dcf629c-939b-48d3-ba96-299fd859f478:c86206360cf31e2cfdf23665972961dc
+FAL_KEY=REDACTED_ROTATE_BEFORE_USING
 ```
 
 ---
@@ -57,7 +57,7 @@ Production'da da çalışması için Vercel'e environment variable ekleyin:
 1. **Vercel Dashboard** → Projenize gidin
 2. **Settings** → **Environment Variables**
 3. **Key**: `FAL_KEY`
-4. **Value**: `7dcf629c-939b-48d3-ba96-299fd859f478:c86206360cf31e2cfdf23665972961dc`
+4. **Value**: `REDACTED_ROTATE_BEFORE_USING`
 5. **Environments**: ☑ Production ☑ Preview ☑ Development
 6. **Add** butonuna tıklayın
 7. **Deployment'ı yeniden başlatın**

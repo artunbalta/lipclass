@@ -90,6 +90,7 @@ export async function createVideo(teacherId: string, videoData: CreateVideoFormD
       video_url: null,
       duration: null,
       curriculum_codes: videoData.curriculumCodes || [],
+      voice_mode: videoData.voiceMode || 'teacher',
     })
     .select(`
       *,
@@ -278,5 +279,6 @@ function mapDbVideoToVideo(dbVideo: any): Video {
     variantLabel: dbVideo.variant_label || undefined,
     language: (dbVideo.language as 'tr' | 'en') || undefined,
     tone: dbVideo.tone || undefined,
+    voiceMode: (dbVideo.voice_mode as 'teacher' | 'robot') || 'teacher',
   };
 }
